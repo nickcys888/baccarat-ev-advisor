@@ -825,12 +825,27 @@
           </label>
         </div>
 
-        <div class="settings" style="grid-template-columns: repeat(2, minmax(0, 1fr));">
-          <label>幸运6：庄两张6赔付
-            <input id="payLucky2" type="number" min="0" step="0.5" value="12">
+        <div class="settings" aria-label="幸运旁注赔率">
+          <label>小幸运6：庄2张6
+            <input id="paySmallLucky6" type="number" min="0" step="0.5" value="22">
           </label>
-          <label>幸运6：庄三张6赔付
-            <input id="payLucky3" type="number" min="0" step="0.5" value="20">
+          <label>大幸运6：庄3张6
+            <input id="payBigLucky6" type="number" min="0" step="0.5" value="50">
+          </label>
+          <label>小幸运7：闲2张7
+            <input id="paySmallLucky7" type="number" min="0" step="0.5" value="15">
+          </label>
+          <label>大幸运7：闲3张7
+            <input id="payBigLucky7" type="number" min="0" step="0.5" value="30">
+          </label>
+          <label>超级幸运7：合计4张
+            <input id="paySuperLucky7Four" type="number" min="0" step="0.5" value="30">
+          </label>
+          <label>超级幸运7：合计5张
+            <input id="paySuperLucky7Five" type="number" min="0" step="0.5" value="40">
+          </label>
+          <label>超级幸运7：合计6张
+            <input id="paySuperLucky7Six" type="number" min="0" step="0.5" value="100">
           </label>
         </div>
 
@@ -919,7 +934,7 @@
         </div>
 
         <div class="note">
-          对子按13个真实牌面分别计算；幸运6按两张庄6、三张庄6分别计算；庄/闲/和、龙7、熊8都按当前剩余牌完整枚举百家乐补牌规则。请按网站真实规则选择返水方式；平台不计和局、无效投注或部分旁注时，还需把对应比例折算后再输入。
+          对子按13个真实牌面分别计算；大小幸运6、大小幸运7分别独立计算；超级幸运7按4、5、6张三个赔付档位合并计算同一注EV。所有项目均按当前剩余牌完整枚举百家乐补牌规则。请按网站真实规则选择返水方式；平台不计和局、无效投注或部分旁注时，还需把对应比例折算后再输入。
         </div>
 
         <div class="shoe-tracker">
@@ -1144,7 +1159,11 @@
       if (banker.length >= 2 && banker[0] === banker[1]) tags.push("庄对");
       if (winner === "庄" && banker.length === 3 && bankerTotal === 7) tags.push("龙7");
       if (winner === "闲" && player.length === 3 && playerTotal === 8) tags.push("熊8");
-      if (winner === "庄" && bankerTotal === 6) tags.push(`幸运6${banker.length}张`);
+      if (winner === "庄" && bankerTotal === 6) tags.push(`${banker.length === 2 ? "小" : "大"}幸运6`);
+      if (winner === "闲" && playerTotal === 7) tags.push(`${player.length === 2 ? "小" : "大"}幸运7`);
+      if (winner === "闲" && playerTotal === 7 && bankerTotal === 6) {
+        tags.push(`超级幸运7·${player.length + banker.length}张`);
+      }
 
       return {
         player,
@@ -1394,7 +1413,12 @@
         dragon7: 0,
         panda8: 0,
         lucky6Two: 0,
-        lucky6Three: 0
+        lucky6Three: 0,
+        lucky7Two: 0,
+        lucky7Three: 0,
+        superLucky7Four: 0,
+        superLucky7Five: 0,
+        superLucky7Six: 0
       };
 
       function settle(prob, playerTotal, bankerTotal, playerCards, bankerCards) {
@@ -1409,6 +1433,14 @@
         } else if (playerTotal > bankerTotal) {
           out.playerWin += prob;
           if (playerCards === 3 && playerTotal === 8) out.panda8 += prob;
+          if (playerTotal === 7 && playerCards === 2) out.lucky7Two += prob;
+          if (playerTotal === 7 && playerCards === 3) out.lucky7Three += prob;
+          if (playerTotal === 7 && bankerTotal === 6) {
+            const totalCards = playerCards + bankerCards;
+            if (totalCards === 4) out.superLucky7Four += prob;
+            if (totalCards === 5) out.superLucky7Five += prob;
+            if (totalCards === 6) out.superLucky7Six += prob;
+          }
         } else {
           out.tie += prob;
         }
@@ -1462,8 +1494,8 @@
       return (payout + 1) * probability - 1;
     }
 
-    function evLucky(probTwo, payTwo, probThree, payThree) {
-      return (payTwo + 1) * probTwo + (payThree + 1) * probThree - 1;
+    function evTiered(events) {
+      return events.reduce((sum, event) => sum + (event.payout + 1) * event.probability, 0) - 1;
     }
 
     function pct(value, digits = 4) {
@@ -1570,8 +1602,13 @@
         const dragonPay = numberValue("payDragon", 40);
         const pandaPay = numberValue("payPanda", 25);
         const tiePay = numberValue("payTie", 8);
-        const luckyTwoPay = numberValue("payLucky2", 12);
-        const luckyThreePay = numberValue("payLucky3", 20);
+        const smallLucky6Pay = numberValue("paySmallLucky6", 22);
+        const bigLucky6Pay = numberValue("payBigLucky6", 50);
+        const smallLucky7Pay = numberValue("paySmallLucky7", 15);
+        const bigLucky7Pay = numberValue("payBigLucky7", 30);
+        const superLucky7FourPay = numberValue("paySuperLucky7Four", 30);
+        const superLucky7FivePay = numberValue("paySuperLucky7Five", 40);
+        const superLucky7SixPay = numberValue("paySuperLucky7Six", 100);
         const rebate = appliedRebateRate / 100;
         const rebateMode = document.getElementById("rebateMode").value;
         const buffer = numberValue("edgeBuffer", 0) / 100;
@@ -1579,7 +1616,7 @@
 
         const pairProb = pairProbability(state.remainingRanks);
         const probs = baccaratProbabilities(toValueCounts(state.remainingRanks));
-        const luckyProb = probs.lucky6Two + probs.lucky6Three;
+        const superLucky7Prob = probs.superLucky7Four + probs.superLucky7Five + probs.superLucky7Six;
         const bankerEv = bankerRule === "standard"
           ? 0.95 * probs.bankerWin - probs.playerWin
           : (probs.bankerWin - probs.bankerDragon7Win) - probs.playerWin;
@@ -1593,7 +1630,20 @@
           { name: "庄对子", probability: pairProb, lossProbability: 1 - pairProb, ev: evSingle(pairProb, pairPay) },
           { name: "龙7", probability: probs.dragon7, lossProbability: 1 - probs.dragon7, ev: evSingle(probs.dragon7, dragonPay) },
           { name: "熊8", probability: probs.panda8, lossProbability: 1 - probs.panda8, ev: evSingle(probs.panda8, pandaPay) },
-          { name: "幸运6", probability: luckyProb, lossProbability: 1 - luckyProb, ev: evLucky(probs.lucky6Two, luckyTwoPay, probs.lucky6Three, luckyThreePay) }
+          { name: "小幸运6", probability: probs.lucky6Two, lossProbability: 1 - probs.lucky6Two, ev: evSingle(probs.lucky6Two, smallLucky6Pay) },
+          { name: "大幸运6", probability: probs.lucky6Three, lossProbability: 1 - probs.lucky6Three, ev: evSingle(probs.lucky6Three, bigLucky6Pay) },
+          { name: "小幸运7", probability: probs.lucky7Two, lossProbability: 1 - probs.lucky7Two, ev: evSingle(probs.lucky7Two, smallLucky7Pay) },
+          { name: "大幸运7", probability: probs.lucky7Three, lossProbability: 1 - probs.lucky7Three, ev: evSingle(probs.lucky7Three, bigLucky7Pay) },
+          {
+            name: "超级幸运7",
+            probability: superLucky7Prob,
+            lossProbability: 1 - superLucky7Prob,
+            ev: evTiered([
+              { probability: probs.superLucky7Four, payout: superLucky7FourPay },
+              { probability: probs.superLucky7Five, payout: superLucky7FivePay },
+              { probability: probs.superLucky7Six, payout: superLucky7SixPay }
+            ])
+          }
         ].map(item => ({
           ...item,
           rebateEv: rebateMode === "loss" ? rebate * item.lossProbability : rebate,
@@ -1693,7 +1743,9 @@
     buildDealControls();
     const calculationControlIds = [
       "decks", "unitBet", "edgeBuffer", "bankerRule", "payPair",
-      "payDragon", "payPanda", "payTie", "payLucky2", "payLucky3",
+      "payDragon", "payPanda", "payTie", "paySmallLucky6", "payBigLucky6",
+      "paySmallLucky7", "payBigLucky7", "paySuperLucky7Four",
+      "paySuperLucky7Five", "paySuperLucky7Six",
       "rebateMode"
     ];
     calculationControlIds.forEach(id => {
