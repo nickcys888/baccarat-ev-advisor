@@ -807,8 +807,8 @@
         <div class="settings">
           <label>庄主注规则
             <select id="bankerRule">
-              <option value="ez" selected>EZ：庄三张7 Push</option>
-              <option value="standard">普通：庄赢抽5%</option>
+              <option value="standard" selected>庄赢抽5%</option>
+              <option value="halfSix">庄6点赢赔一半</option>
             </select>
           </label>
           <label>对子赔付
@@ -1409,7 +1409,6 @@
         bankerWin: 0,
         playerWin: 0,
         tie: 0,
-        bankerDragon7Win: 0,
         dragon7: 0,
         panda8: 0,
         lucky6Two: 0,
@@ -1426,7 +1425,6 @@
           out.bankerWin += prob;
           if (bankerCards === 3 && bankerTotal === 7) {
             out.dragon7 += prob;
-            out.bankerDragon7Win += prob;
           }
           if (bankerTotal === 6 && bankerCards === 2) out.lucky6Two += prob;
           if (bankerTotal === 6 && bankerCards === 3) out.lucky6Three += prob;
@@ -1617,9 +1615,10 @@
         const pairProb = pairProbability(state.remainingRanks);
         const probs = baccaratProbabilities(toValueCounts(state.remainingRanks));
         const superLucky7Prob = probs.superLucky7Four + probs.superLucky7Five + probs.superLucky7Six;
-        const bankerEv = bankerRule === "standard"
-          ? 0.95 * probs.bankerWin - probs.playerWin
-          : (probs.bankerWin - probs.bankerDragon7Win) - probs.playerWin;
+        const bankerSixWin = probs.lucky6Two + probs.lucky6Three;
+        const bankerEv = bankerRule === "halfSix"
+          ? probs.bankerWin - 0.5 * bankerSixWin - probs.playerWin
+          : 0.95 * probs.bankerWin - probs.playerWin;
         const playerEv = probs.playerWin - probs.bankerWin;
 
         const items = [
