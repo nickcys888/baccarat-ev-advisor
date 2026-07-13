@@ -1,0 +1,1726 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>百家乐正EV下注提示器</title>
+  <script src="https://telegram.org/js/telegram-web-app.js?62"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #eef2f5;
+      --panel: #ffffff;
+      --ink: #17202a;
+      --muted: #5f6f7d;
+      --line: #d7e0e7;
+      --soft: #f7fafc;
+      --accent: #0f766e;
+      --accent-strong: #0b5f59;
+      --accent-text: #ffffff;
+      --good: #047857;
+      --good-bg: #dff7ec;
+      --bad: #be123c;
+      --bad-bg: #ffe4e6;
+      --warn: #8a4b0f;
+      --warn-bg: #fff7ed;
+      --blue: #1d4ed8;
+      --blue-bg: #dbeafe;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      letter-spacing: 0;
+      overflow-x: hidden;
+      overscroll-behavior-y: contain;
+    }
+
+    body.telegram-webapp {
+      --bg: var(--tg-theme-secondary-bg-color, #eef2f5);
+      --panel: var(--tg-theme-bg-color, #ffffff);
+      --ink: var(--tg-theme-text-color, #17202a);
+      --muted: var(--tg-theme-hint-color, #5f6f7d);
+      --accent: var(--tg-theme-button-color, #0f766e);
+      --accent-text: var(--tg-theme-button-text-color, #ffffff);
+      min-height: var(--tg-viewport-stable-height, 100dvh);
+    }
+
+    body.telegram-webapp main {
+      min-height: var(--tg-viewport-stable-height, 100dvh);
+      padding-top: max(12px, var(--tg-content-safe-top, 0px));
+      padding-right: max(12px, var(--tg-content-safe-right, 0px));
+      padding-bottom: max(12px, var(--tg-content-safe-bottom, 0px));
+      padding-left: max(12px, var(--tg-content-safe-left, 0px));
+    }
+
+    main {
+      width: min(1380px, 100%);
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 18px;
+      margin-bottom: 14px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.2;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 17px;
+      line-height: 1.25;
+    }
+
+    .sub {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(390px, 0.85fr);
+      gap: 14px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+
+    .top-alert {
+      margin-bottom: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 14px;
+    }
+
+    .alert-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .alert-title strong {
+      font-size: 18px;
+    }
+
+    .bet-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 10px;
+    }
+
+    .bet-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 11px;
+      background: var(--soft);
+      min-height: 96px;
+    }
+
+    .bet-card.good {
+      border-color: #9adbbd;
+      background: var(--good-bg);
+    }
+
+    .bet-card .name {
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .bet-card .ev {
+      margin-top: 7px;
+      font-size: 24px;
+      font-weight: 860;
+      color: var(--good);
+    }
+
+    .bet-card .small {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .settings {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .primary-settings {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .rebate-panel {
+      display: grid;
+      grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) 2fr;
+      gap: 10px;
+      align-items: end;
+      margin-bottom: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--soft);
+      padding: 12px;
+    }
+
+    .field-action {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+    }
+
+    .rebate-presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      min-height: 38px;
+    }
+
+    .rebate-presets button {
+      min-height: 34px;
+      padding: 6px 10px;
+    }
+
+    .rebate-summary {
+      width: 100%;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 720;
+    }
+
+    input, select {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fbfdfe;
+      color: var(--ink);
+      padding: 8px 10px;
+      font-size: 15px;
+    }
+
+    input:focus, select:focus {
+      outline: 2px solid rgba(15, 118, 110, 0.18);
+      border-color: var(--accent);
+    }
+
+    .rank-buttons {
+      display: grid;
+      grid-template-columns: repeat(13, minmax(54px, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .rank-btn {
+      display: grid;
+      place-items: center;
+      min-height: 48px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #edf3f6;
+      color: #1e2b36;
+      font-size: 16px;
+      font-weight: 860;
+      cursor: pointer;
+    }
+
+    .rank-btn:hover {
+      border-color: var(--accent);
+      background: #e1f4f1;
+    }
+
+    .rank-grid {
+      display: grid;
+      grid-template-columns: repeat(13, minmax(54px, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .rank-cell {
+      display: grid;
+      gap: 6px;
+    }
+
+    .rank-label {
+      display: grid;
+      place-items: center;
+      min-height: 26px;
+      border-radius: 6px;
+      background: #e7edf2;
+      color: #25313d;
+      font-size: 13px;
+      font-weight: 850;
+    }
+
+    .rank-cell input {
+      text-align: center;
+      padding: 8px 4px;
+    }
+
+    .quick {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto auto;
+      gap: 8px;
+      margin-top: 12px;
+      align-items: end;
+    }
+
+    .hand-entry {
+      margin: 12px 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--soft);
+      padding: 12px;
+    }
+
+    .deal-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(74px, 1fr));
+      gap: 8px;
+    }
+
+    .deal-slot {
+      display: grid;
+      gap: 6px;
+    }
+
+    .deal-slot span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 780;
+    }
+
+    .hand-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .hand-log {
+      display: grid;
+      gap: 6px;
+      margin-top: 10px;
+      max-height: 190px;
+      overflow: auto;
+    }
+
+    .hand-log-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      padding: 7px 9px;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .hand-log-item b {
+      white-space: nowrap;
+    }
+
+    .shoe-tracker {
+      margin-top: 16px;
+      border-top: 1px solid var(--line);
+      padding-top: 14px;
+    }
+
+    .tracker-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .tracker-title h2 {
+      margin: 0;
+    }
+
+    .tracker-block {
+      display: grid;
+      gap: 7px;
+      margin-top: 12px;
+    }
+
+    .tracker-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .burn-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      min-height: 32px;
+      align-items: center;
+    }
+
+    .rank-pill {
+      display: inline-grid;
+      place-items: center;
+      min-width: 32px;
+      min-height: 28px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 850;
+      padding: 4px 7px;
+    }
+
+    .road-grid {
+      display: grid;
+      grid-template-rows: repeat(6, 28px);
+      grid-auto-flow: column;
+      grid-auto-columns: 28px;
+      gap: 5px;
+      max-width: 100%;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .road-cell {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .road-cell.banker { background: #dc2626; }
+    .road-cell.player { background: #2563eb; }
+    .road-cell.tie { background: #16a34a; }
+
+    .shoe-list {
+      margin-top: 12px;
+      max-height: 360px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .shoe-table th,
+    .shoe-table td {
+      font-size: 12px;
+      padding: 8px 6px;
+      vertical-align: top;
+    }
+
+    .shoe-table td:first-child,
+    .shoe-table th:first-child {
+      width: 50px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .result-badge {
+      display: inline-grid;
+      place-items: center;
+      min-width: 34px;
+      border-radius: 999px;
+      color: #fff;
+      padding: 3px 7px;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .result-badge.banker { background: #dc2626; }
+    .result-badge.player { background: #2563eb; }
+    .result-badge.tie { background: #16a34a; }
+
+    .side-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      justify-content: flex-end;
+    }
+
+    .side-tag {
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #3730a3;
+      padding: 2px 6px;
+      font-size: 11px;
+      font-weight: 850;
+      white-space: nowrap;
+    }
+
+    button {
+      min-height: 38px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      padding: 8px 12px;
+      background: var(--accent);
+      color: var(--accent-text);
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    button:hover { filter: brightness(0.98); }
+    button:active { transform: translateY(1px); }
+
+    button.secondary {
+      background: #edf3f6;
+      border-color: var(--line);
+      color: #24313d;
+    }
+
+    button.danger {
+      background: #fff1f2;
+      border-color: #fecdd3;
+      color: var(--bad);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .table-scroll {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .table-scroll > table {
+      min-width: 610px;
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 9px 7px;
+      text-align: right;
+      vertical-align: middle;
+    }
+
+    th:first-child, td:first-child { text-align: left; }
+    tr:last-child td { border-bottom: 0; }
+
+    th {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .decision {
+      display: inline-grid;
+      place-items: center;
+      min-width: 58px;
+      padding: 5px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .bet { color: white; background: var(--good); }
+    .pass { color: #8b1d2c; background: var(--bad-bg); }
+    .watch { color: #1e3a8a; background: var(--blue-bg); }
+    .pos { color: var(--good); font-weight: 820; }
+    .neg { color: var(--bad); font-weight: 820; }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--soft);
+      padding: 10px;
+    }
+
+    .metric .k {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .metric .v {
+      margin-top: 3px;
+      font-size: 20px;
+      font-weight: 860;
+    }
+
+    .count-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .count-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: var(--soft);
+    }
+
+    .count-card strong {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 6px;
+    }
+
+    .count-values {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .count-values b {
+      display: block;
+      color: var(--ink);
+      font-size: 17px;
+      margin-top: 2px;
+    }
+
+    .note, .error {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .note {
+      background: var(--warn-bg);
+      border: 1px solid #fed7aa;
+      color: var(--warn);
+    }
+
+    .error {
+      display: none;
+      background: #fff1f2;
+      border: 1px solid #fecdd3;
+      color: var(--bad);
+    }
+
+    .fine {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .js-warning {
+      margin: 12px;
+      border: 1px solid #fecdd3;
+      border-radius: 8px;
+      background: #fff1f2;
+      color: var(--bad);
+      padding: 12px;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    @media (max-width: 1040px) {
+      main { padding: 12px; }
+      header { display: block; }
+      .layout { grid-template-columns: 1fr; }
+      .settings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .primary-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .rebate-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .rebate-presets { grid-column: 1 / -1; }
+      .rank-buttons, .rank-grid { grid-template-columns: repeat(7, minmax(44px, 1fr)); }
+      .deal-grid { grid-template-columns: repeat(3, minmax(74px, 1fr)); }
+      .quick { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 560px) {
+      main {
+        padding: max(8px, env(safe-area-inset-top)) 8px max(12px, env(safe-area-inset-bottom));
+      }
+      body.telegram-webapp main {
+        padding-top: max(8px, var(--tg-content-safe-top, env(safe-area-inset-top)));
+        padding-right: max(8px, var(--tg-content-safe-right, env(safe-area-inset-right)));
+        padding-bottom: max(12px, var(--tg-content-safe-bottom, env(safe-area-inset-bottom)));
+        padding-left: max(8px, var(--tg-content-safe-left, env(safe-area-inset-left)));
+      }
+      h1 { font-size: 21px; }
+      h2 { font-size: 16px; }
+      .sub { font-size: 13px; }
+      .panel, .top-alert { padding: 10px; }
+      .alert-title {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .alert-title strong { font-size: 17px; }
+      .bet-list { grid-template-columns: 1fr; }
+      .settings, .count-grid { grid-template-columns: 1fr; }
+      section .settings { grid-template-columns: 1fr !important; }
+      .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .primary-settings { grid-template-columns: 1fr; }
+      .rebate-panel { grid-template-columns: 1fr; }
+      .field-action { grid-template-columns: 1fr; }
+      .rebate-presets {
+        display: grid;
+        grid-column: auto;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+      .rebate-summary { grid-column: 1 / -1; }
+      input, select {
+        min-height: 44px;
+        font-size: 16px;
+      }
+      button { min-height: 44px; }
+      .rank-buttons, .rank-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 6px;
+      }
+      .rank-btn { min-height: 52px; }
+      .deal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .hand-actions {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .hand-actions button {
+        padding-inline: 6px;
+        white-space: normal;
+      }
+      .hand-log-item {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .quick button { width: 100%; }
+      .metric { padding: 8px 6px; }
+      .metric .v { font-size: 17px; }
+      .shoe-table { min-width: 560px; }
+      th, td { padding: 8px 5px; font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <noscript>
+    <div class="js-warning">当前打开方式禁止运行网页交互。请先解压文件，再使用 Chrome、Safari 或 Edge 打开 index.html；不要在聊天软件的文件预览器中直接查看。</div>
+  </noscript>
+  <main>
+    <header>
+      <div>
+        <h1>百家乐正EV下注提示器</h1>
+        <p class="sub">从每鞋第一张可见 burn card 开始录入。最终下注提示以“当前剩余牌精确EV + 返水 &gt; 缓冲值”为准，龙7/熊8的TC只是参考信号。</p>
+      </div>
+    </header>
+
+    <div class="top-alert">
+      <div class="alert-title">
+        <strong>当前下注提示</strong>
+        <span id="calcStatus" class="fine">等待录入</span>
+      </div>
+      <div id="betList" class="bet-list"></div>
+    </div>
+
+    <div class="layout">
+      <section class="panel">
+        <h2>录入已出牌</h2>
+        <div class="settings primary-settings">
+          <label>牌鞋副数
+            <input id="decks" type="number" min="1" max="12" step="1" value="8">
+          </label>
+          <label>下注单位
+            <input id="unitBet" type="number" min="0" step="100" value="100000">
+          </label>
+          <label>EV缓冲 %
+            <input id="edgeBuffer" type="number" step="0.1" value="0">
+          </label>
+        </div>
+
+        <div class="rebate-panel">
+          <label>返水比例（%）
+            <div class="field-action">
+              <input id="rebateRate" type="number" min="0" max="100" step="0.01" value="0.7" inputmode="decimal">
+              <button id="applyRebate" type="button">应用返水</button>
+            </div>
+          </label>
+          <label>返水计算方式
+            <select id="rebateMode">
+              <option value="turnover" selected>按有效下注额返</option>
+              <option value="loss">只对亏损金额返</option>
+            </select>
+          </label>
+          <div class="rebate-presets" aria-label="常用返水比例">
+            <button type="button" class="secondary rebate-preset" data-rebate="0">0%</button>
+            <button type="button" class="secondary rebate-preset" data-rebate="0.5">0.5%</button>
+            <button type="button" class="secondary rebate-preset" data-rebate="0.7">0.7%</button>
+            <button type="button" class="secondary rebate-preset" data-rebate="1">1%</button>
+            <span id="rebateSummary" class="rebate-summary">当前采用：按有效下注额返 0.700%</span>
+          </div>
+        </div>
+
+        <div class="settings">
+          <label>庄主注规则
+            <select id="bankerRule">
+              <option value="ez" selected>EZ：庄三张7 Push</option>
+              <option value="standard">普通：庄赢抽5%</option>
+            </select>
+          </label>
+          <label>对子赔付
+            <input id="payPair" type="number" min="1" step="0.5" value="11">
+          </label>
+          <label>龙7赔付
+            <input id="payDragon" type="number" min="1" step="0.5" value="40">
+          </label>
+          <label>熊8赔付
+            <input id="payPanda" type="number" min="1" step="0.5" value="25">
+          </label>
+          <label>和局赔付
+            <input id="payTie" type="number" min="1" step="0.5" value="8">
+          </label>
+        </div>
+
+        <div class="settings" style="grid-template-columns: repeat(2, minmax(0, 1fr));">
+          <label>幸运6：庄两张6赔付
+            <input id="payLucky2" type="number" min="0" step="0.5" value="12">
+          </label>
+          <label>幸运6：庄三张6赔付
+            <input id="payLucky3" type="number" min="0" step="0.5" value="20">
+          </label>
+        </div>
+
+        <div class="rank-buttons" id="rankButtons"></div>
+
+        <div class="hand-entry">
+          <h2>本局发牌顺序</h2>
+          <div id="dealGrid" class="deal-grid"></div>
+          <div class="hand-actions">
+            <button id="commitHand" type="button">提交本局</button>
+            <button id="clearHand" type="button" class="secondary">清空本局</button>
+            <button id="undoHand" type="button" class="secondary">撤销上一局</button>
+          </div>
+          <div class="fine">顺序固定：闲1、庄1、闲2、庄2、闲3、庄3。没有第三张就留空。burn card 用下面的快捷加入或牌面按钮录入。</div>
+          <div id="handLog" class="hand-log"></div>
+        </div>
+
+        <label>已出牌数量（包含所有可见 burn card、庄闲所有发牌、第三张牌）</label>
+        <div id="rankGrid" class="rank-grid"></div>
+
+        <div class="quick">
+          <label>快速加入
+            <input id="quickInput" placeholder="例：A 8 9 K 或 A:2, 5:4, 10x3">
+          </label>
+          <button id="applyQuick" type="button">加入</button>
+          <button id="undoLast" type="button" class="secondary">撤销上一张/批次</button>
+          <button id="resetSeen" type="button" class="danger">新鞋清零</button>
+        </div>
+
+        <div id="error" class="error"></div>
+
+        <div class="note">
+          严格起点：切牌后第一张正面 burn card 看到就录入；后续可见 burn 也录入；看不见牌值的 burn 不要乱猜。正EV只代表长期期望为正，不保证这一手赢。
+        </div>
+      </section>
+
+      <aside class="panel">
+        <h2>精确EV结果</h2>
+        <div class="metrics">
+          <div class="metric">
+            <div class="k">剩余牌</div>
+            <div id="remainingCards" class="v">416</div>
+          </div>
+          <div class="metric">
+            <div class="k">已出牌</div>
+            <div id="seenCards" class="v">0</div>
+          </div>
+          <div class="metric">
+            <div class="k">已出进度</div>
+            <div id="dealtPct" class="v">0.0%</div>
+          </div>
+        </div>
+
+        <div class="count-grid">
+          <div class="count-card">
+            <strong>龙7计数参考</strong>
+            <div class="count-values">
+              <span>RC<b id="dragonRc">0</b></span>
+              <span>TC<b id="dragonTc">0.00</b></span>
+            </div>
+            <div id="dragonCountSignal" class="fine">TC整数 ≥ 4 才是计数触发</div>
+          </div>
+          <div class="count-card">
+            <strong>熊8计数参考</strong>
+            <div class="count-values">
+              <span>RC<b id="pandaRc">0</b></span>
+              <span>TC<b id="pandaTc">0.00</b></span>
+            </div>
+            <div id="pandaCountSignal" class="fine">TC整数 ≥ 11 才是计数触发</div>
+          </div>
+        </div>
+
+        <div class="table-scroll" role="region" aria-label="精确EV结果，可横向滑动">
+          <table>
+            <thead>
+              <tr>
+                <th>项目</th>
+                <th>概率</th>
+                <th>原始EV</th>
+                <th>返水后EV</th>
+                <th>提示</th>
+              </tr>
+            </thead>
+            <tbody id="results"></tbody>
+          </table>
+        </div>
+
+        <div class="note">
+          对子按13个真实牌面分别计算；幸运6按两张庄6、三张庄6分别计算；庄/闲/和、龙7、熊8都按当前剩余牌完整枚举百家乐补牌规则。请按网站真实规则选择返水方式；平台不计和局、无效投注或部分旁注时，还需把对应比例折算后再输入。
+        </div>
+
+        <div class="shoe-tracker">
+          <div class="tracker-title">
+            <h2>牌靴记录</h2>
+            <span id="trackerStatus" class="fine">暂无记录</span>
+          </div>
+          <div class="tracker-block">
+            <div class="tracker-label">去掉的牌 / burn</div>
+            <div id="burnCards" class="burn-strip"></div>
+          </div>
+          <div class="tracker-block">
+            <div class="tracker-label">路单</div>
+            <div id="roadmap" class="road-grid"></div>
+          </div>
+          <div id="shoeList" class="shoe-list"></div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <script>
+    const ranks = [
+      { key: "A", label: "A", value: 1 },
+      { key: "2", label: "2", value: 2 },
+      { key: "3", label: "3", value: 3 },
+      { key: "4", label: "4", value: 4 },
+      { key: "5", label: "5", value: 5 },
+      { key: "6", label: "6", value: 6 },
+      { key: "7", label: "7", value: 7 },
+      { key: "8", label: "8", value: 8 },
+      { key: "9", label: "9", value: 9 },
+      { key: "T", label: "10", value: 0 },
+      { key: "J", label: "J", value: 0 },
+      { key: "Q", label: "Q", value: 0 },
+      { key: "K", label: "K", value: 0 }
+    ];
+
+    const dealSlots = [
+      { key: "P1", label: "闲1" },
+      { key: "B1", label: "庄1" },
+      { key: "P2", label: "闲2" },
+      { key: "B2", label: "庄2" },
+      { key: "P3", label: "闲3" },
+      { key: "B3", label: "庄3" }
+    ];
+
+    const dragonTags = { A: 0, 2: 0, 3: 0, 4: -1, 5: -1, 6: -1, 7: -1, 8: 2, 9: 2, T: 0, J: 0, Q: 0, K: 0 };
+    const pandaTags = { A: 1, 2: 1, 3: -2, 4: -2, 5: -2, 6: -1, 7: -1, 8: -2, 9: 4, T: 1, J: 1, Q: 1, K: 1 };
+
+    const rankGrid = document.getElementById("rankGrid");
+    const rankButtons = document.getElementById("rankButtons");
+    const dealGrid = document.getElementById("dealGrid");
+    const handLog = document.getElementById("handLog");
+    const resultBody = document.getElementById("results");
+    const betList = document.getElementById("betList");
+    const errorBox = document.getElementById("error");
+    const trackerStatus = document.getElementById("trackerStatus");
+    const burnCards = document.getElementById("burnCards");
+    const roadmap = document.getElementById("roadmap");
+    const shoeList = document.getElementById("shoeList");
+    const history = [];
+    let appliedRebateRate = 0.7;
+    let calculateTimer = null;
+
+    function syncTelegramSafeArea(telegram) {
+      const inset = telegram.contentSafeAreaInset || telegram.safeAreaInset;
+      if (!inset) return;
+      const rootStyle = document.documentElement.style;
+      rootStyle.setProperty("--tg-content-safe-top", `${Number(inset.top || 0)}px`);
+      rootStyle.setProperty("--tg-content-safe-right", `${Number(inset.right || 0)}px`);
+      rootStyle.setProperty("--tg-content-safe-bottom", `${Number(inset.bottom || 0)}px`);
+      rootStyle.setProperty("--tg-content-safe-left", `${Number(inset.left || 0)}px`);
+    }
+
+    function initTelegramWebApp() {
+      const telegram = window.Telegram?.WebApp;
+      if (!telegram) return;
+      document.body.classList.add("telegram-webapp");
+      syncTelegramSafeArea(telegram);
+      try {
+        telegram.setHeaderColor("bg_color");
+        telegram.setBackgroundColor("secondary_bg_color");
+        if (telegram.setBottomBarColor) telegram.setBottomBarColor("secondary_bg_color");
+        if (telegram.enableVerticalSwipes) telegram.enableVerticalSwipes();
+        telegram.onEvent("safeAreaChanged", () => syncTelegramSafeArea(telegram));
+        telegram.onEvent("contentSafeAreaChanged", () => syncTelegramSafeArea(telegram));
+        telegram.ready();
+        telegram.expand();
+      } catch (error) {
+        console.warn("Telegram WebApp initialization skipped:", error);
+      }
+    }
+
+    function buildRankControls() {
+      rankGrid.innerHTML = "";
+      rankButtons.innerHTML = "";
+      for (const rank of ranks) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "rank-btn";
+        button.textContent = rank.label;
+        button.addEventListener("click", () => addCards(rank.key, 1, true));
+        rankButtons.appendChild(button);
+
+        const cell = document.createElement("div");
+        cell.className = "rank-cell";
+        cell.innerHTML = `
+          <div class="rank-label">${rank.label}</div>
+          <input id="seen-${rank.key}" type="number" min="0" step="1" value="0" inputmode="numeric">
+        `;
+        rankGrid.appendChild(cell);
+      }
+    }
+
+    function buildDealControls() {
+      dealGrid.innerHTML = "";
+      const options = `<option value="">空</option>` + ranks.map(rank => `<option value="${rank.key}">${rank.label}</option>`).join("");
+      for (const slot of dealSlots) {
+        const wrap = document.createElement("label");
+        wrap.className = "deal-slot";
+        wrap.innerHTML = `
+          <span>${slot.label}</span>
+          <select id="deal-${slot.key}">${options}</select>
+        `;
+        dealGrid.appendChild(wrap);
+      }
+    }
+
+    function numberValue(id, fallback = 0) {
+      const n = Number(document.getElementById(id).value);
+      return Number.isFinite(n) ? n : fallback;
+    }
+
+    function showError(message) {
+      errorBox.style.display = message ? "block" : "none";
+      errorBox.textContent = message || "";
+    }
+
+    function rebateModeLabel() {
+      return document.getElementById("rebateMode").value === "loss"
+        ? "只对亏损金额返"
+        : "按有效下注额返";
+    }
+
+    function updateRebateSummary() {
+      document.getElementById("rebateSummary").textContent =
+        `当前采用：${rebateModeLabel()} ${appliedRebateRate.toFixed(3)}%`;
+    }
+
+    function applyRebate(value = numberValue("rebateRate", appliedRebateRate)) {
+      if (!Number.isFinite(value) || value < 0 || value > 100) {
+        showError("返水比例必须在 0% 到 100% 之间");
+        return;
+      }
+      appliedRebateRate = value;
+      document.getElementById("rebateRate").value = String(value);
+      updateRebateSummary();
+      calculateNow();
+    }
+
+    function scheduleCalculate() {
+      if (calculateTimer !== null) clearTimeout(calculateTimer);
+      calculateTimer = setTimeout(() => {
+        calculateTimer = null;
+        calculate();
+      }, 90);
+    }
+
+    function calculateNow() {
+      if (calculateTimer !== null) {
+        clearTimeout(calculateTimer);
+        calculateTimer = null;
+      }
+      calculate();
+    }
+
+    function normalizeRank(raw) {
+      const token = String(raw).trim().toUpperCase();
+      if (token === "1" || token === "A") return "A";
+      if (token === "10" || token === "T") return "T";
+      if (["2", "3", "4", "5", "6", "7", "8", "9", "J", "Q", "K"].includes(token)) return token;
+      return null;
+    }
+
+    function rankLabel(key) {
+      return ranks.find(rank => rank.key === key)?.label || key;
+    }
+
+    function rankValue(key) {
+      return ranks.find(rank => rank.key === key)?.value ?? 0;
+    }
+
+    function totalCardsInEntry(entry) {
+      return entry?.cards?.reduce((sum, card) => sum + card.amount, 0) || 0;
+    }
+
+    function baccaratTotal(keys) {
+      return keys.reduce((sum, key) => sum + rankValue(key), 0) % 10;
+    }
+
+    function cardsBySide(entry, side) {
+      return ["1", "2", "3"]
+        .map(n => entry.slots.find(slot => slot.slot === `${side}${n}`)?.key)
+        .filter(Boolean);
+    }
+
+    function formatCards(keys) {
+      return keys.length ? keys.map(rankLabel).join(" ") : "-";
+    }
+
+    function handSummary(entry) {
+      const player = cardsBySide(entry, "P");
+      const banker = cardsBySide(entry, "B");
+      const playerTotal = baccaratTotal(player);
+      const bankerTotal = baccaratTotal(banker);
+      const winner = playerTotal > bankerTotal ? "闲" : bankerTotal > playerTotal ? "庄" : "和";
+      const winnerClass = winner === "庄" ? "banker" : winner === "闲" ? "player" : "tie";
+      const tags = [];
+
+      if (player.length >= 2 && player[0] === player[1]) tags.push("闲对");
+      if (banker.length >= 2 && banker[0] === banker[1]) tags.push("庄对");
+      if (winner === "庄" && banker.length === 3 && bankerTotal === 7) tags.push("龙7");
+      if (winner === "闲" && player.length === 3 && playerTotal === 8) tags.push("熊8");
+      if (winner === "庄" && bankerTotal === 6) tags.push(`幸运6${banker.length}张`);
+
+      return {
+        player,
+        banker,
+        playerTotal,
+        bankerTotal,
+        winner,
+        winnerClass,
+        tags
+      };
+    }
+
+    function renderShoeTracker() {
+      const hands = history.filter(entry => entry.type === "hand");
+      const removed = history.filter(entry => entry.type === "cards");
+      const removedCount = removed.reduce((sum, entry) => sum + totalCardsInEntry(entry), 0);
+      const historyTotal = history.reduce((sum, entry) => sum + totalCardsInEntry(entry), 0);
+      const seenTotal = ranks.reduce((sum, rank) => sum + Math.max(0, Math.floor(numberValue(`seen-${rank.key}`, 0))), 0);
+      const manualNote = seenTotal !== historyTotal ? "，数量表有手工修改" : "";
+
+      trackerStatus.textContent = `去牌${removedCount}张，已记录${hands.length}局${manualNote}`;
+
+      const burnItems = removed.flatMap(entry => entry.cards.map(card => ({
+        key: card.key,
+        amount: card.amount,
+        label: entry.label
+      })));
+      burnCards.innerHTML = burnItems.length
+        ? burnItems.map(item => `<span class="rank-pill" title="${item.label}">${rankLabel(item.key)}${item.amount > 1 ? `×${item.amount}` : ""}</span>`).join("")
+        : `<span class="fine">还没有单独录入去掉的牌。第一张 burn card 可用牌面按钮或快速加入录入。</span>`;
+
+      roadmap.innerHTML = hands.length
+        ? hands.map(entry => {
+          const summary = handSummary(entry);
+          return `<div class="road-cell ${summary.winnerClass}" title="第${entry.handNo}局：${summary.winner}">${summary.winner}</div>`;
+        }).join("")
+        : `<span class="fine">提交本局后自动生成。</span>`;
+
+      if (hands.length === 0) {
+        shoeList.innerHTML = `<div class="fine" style="padding: 10px;">暂无局记录。每提交一局，这里会按第一局、第二局、第三局继续排列。</div>`;
+        return;
+      }
+
+      shoeList.innerHTML = `
+        <table class="shoe-table">
+          <thead>
+            <tr>
+              <th>局</th>
+              <th>闲牌</th>
+              <th>庄牌</th>
+              <th>结果</th>
+              <th>触发</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${hands.map(entry => {
+              const summary = handSummary(entry);
+              return `
+                <tr>
+                  <td>第${entry.handNo}局</td>
+                  <td>${formatCards(summary.player)}<br><span class="fine">点数 ${summary.playerTotal}</span></td>
+                  <td>${formatCards(summary.banker)}<br><span class="fine">点数 ${summary.bankerTotal}</span></td>
+                  <td><span class="result-badge ${summary.winnerClass}">${summary.winner}</span></td>
+                  <td>
+                    <div class="side-tags">
+                      ${summary.tags.length ? summary.tags.map(tag => `<span class="side-tag">${tag}</span>`).join("") : `<span class="fine">-</span>`}
+                    </div>
+                  </td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function applyCardDelta(key, amount) {
+      const input = document.getElementById(`seen-${key}`);
+      const current = Math.max(0, Math.floor(Number(input.value || 0)));
+      input.value = String(Math.max(0, current + amount));
+    }
+
+    function addCards(key, amount, trackHistory) {
+      try {
+        validateAddition([{ key, amount }]);
+      } catch (error) {
+        showError(error.message);
+        return;
+      }
+      applyCardDelta(key, amount);
+      if (trackHistory && amount > 0) {
+        history.push({
+          type: "cards",
+          label: "单张录入",
+          cards: [{ key, amount }]
+        });
+      }
+      calculate();
+    }
+
+    function validateAddition(cards) {
+      const state = getState();
+      const additions = Object.fromEntries(ranks.map(rank => [rank.key, 0]));
+      for (const card of cards) additions[card.key] += card.amount;
+      for (let i = 0; i < ranks.length; i += 1) {
+        const rank = ranks[i];
+        if (state.seen[i] + additions[rank.key] > state.fullPerRank) {
+          throw new Error(`${rank.label} 加入后会超过 ${state.fullPerRank} 张，请检查录入。`);
+        }
+      }
+    }
+
+    function nextHandNumber() {
+      return history.filter(entry => entry.type === "hand").length + 1;
+    }
+
+    function getDealSelection() {
+      return dealSlots.map(slot => ({
+        slot: slot.key,
+        slotLabel: slot.label,
+        key: document.getElementById(`deal-${slot.key}`).value
+      }));
+    }
+
+    function clearDealInputs() {
+      for (const slot of dealSlots) document.getElementById(`deal-${slot.key}`).value = "";
+    }
+
+    function commitHand() {
+      try {
+        showError("");
+        const slots = getDealSelection();
+        const firstFour = slots.slice(0, 4);
+        if (firstFour.some(slot => !slot.key)) {
+          throw new Error("本局至少要录入闲1、庄1、闲2、庄2。第三张没有就留空。");
+        }
+        const cards = slots
+          .filter(slot => slot.key)
+          .map(slot => ({ key: slot.key, amount: 1 }));
+        validateAddition(cards);
+        for (const card of cards) applyCardDelta(card.key, card.amount);
+        history.push({
+          type: "hand",
+          handNo: nextHandNumber(),
+          slots,
+          cards
+        });
+        clearDealInputs();
+        calculate();
+      } catch (error) {
+        showError(error.message);
+      }
+    }
+
+    function undoEntry(entry) {
+      if (!entry) return;
+      for (let i = entry.cards.length - 1; i >= 0; i -= 1) {
+        applyCardDelta(entry.cards[i].key, -entry.cards[i].amount);
+      }
+    }
+
+    function undoLastHand() {
+      const index = history.findLastIndex(entry => entry.type === "hand");
+      if (index === -1) return;
+      const [entry] = history.splice(index, 1);
+      undoEntry(entry);
+      calculate();
+    }
+
+    function renderHandLog() {
+      const hands = history.filter(entry => entry.type === "hand");
+      if (hands.length === 0) {
+        handLog.innerHTML = `<div class="fine">暂无局记录。提交本局后，这里会按局回溯显示。</div>`;
+        return;
+      }
+      handLog.innerHTML = hands.slice(-8).reverse().map(entry => {
+        const text = dealSlots.map(slot => {
+          const found = entry.slots.find(item => item.slot === slot.key);
+          return `${slot.label}:${found?.key ? rankLabel(found.key) : "-"}`;
+        }).join("  ");
+        return `
+          <div class="hand-log-item">
+            <b>第${entry.handNo}局</b>
+            <span>${text}</span>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function getState() {
+      const decks = Math.max(1, Math.floor(numberValue("decks", 8)));
+      const fullPerRank = decks * 4;
+      const seen = ranks.map(rank => Math.max(0, Math.floor(numberValue(`seen-${rank.key}`, 0))));
+      const remainingRanks = seen.map(v => fullPerRank - v);
+      const badIndex = remainingRanks.findIndex(v => v < 0);
+      if (badIndex !== -1) {
+        throw new Error(`${ranks[badIndex].label} 已出牌超过 ${fullPerRank} 张，请检查录入。`);
+      }
+      const total = remainingRanks.reduce((a, b) => a + b, 0);
+      if (total < 6) throw new Error("剩余牌少于 6 张，无法完整枚举一手百家乐。");
+      return { decks, fullPerRank, seen, remainingRanks, total, fullTotal: decks * 52 };
+    }
+
+    function toValueCounts(rankCounts) {
+      const values = Array(10).fill(0);
+      rankCounts.forEach((count, i) => {
+        values[ranks[i].value] += count;
+      });
+      return values;
+    }
+
+    function pairProbability(rankCounts) {
+      const total = rankCounts.reduce((a, b) => a + b, 0);
+      if (total < 2) return 0;
+      const numerator = rankCounts.reduce((sum, c) => sum + c * (c - 1), 0);
+      return numerator / (total * (total - 1));
+    }
+
+    function drawEach(counts, total, fn) {
+      if (total <= 0) return;
+      for (let value = 0; value <= 9; value += 1) {
+        const count = counts[value];
+        if (count <= 0) continue;
+        counts[value] -= 1;
+        fn(value, count / total);
+        counts[value] += 1;
+      }
+    }
+
+    function bankerDraws(bankerTotal, playerThird) {
+      if (bankerTotal <= 2) return true;
+      if (bankerTotal === 3) return playerThird !== 8;
+      if (bankerTotal === 4) return playerThird >= 2 && playerThird <= 7;
+      if (bankerTotal === 5) return playerThird >= 4 && playerThird <= 7;
+      if (bankerTotal === 6) return playerThird === 6 || playerThird === 7;
+      return false;
+    }
+
+    function baccaratProbabilities(valueCounts) {
+      const counts = valueCounts.slice();
+      const totalCards = counts.reduce((a, b) => a + b, 0);
+      const out = {
+        bankerWin: 0,
+        playerWin: 0,
+        tie: 0,
+        bankerDragon7Win: 0,
+        dragon7: 0,
+        panda8: 0,
+        lucky6Two: 0,
+        lucky6Three: 0
+      };
+
+      function settle(prob, playerTotal, bankerTotal, playerCards, bankerCards) {
+        if (bankerTotal > playerTotal) {
+          out.bankerWin += prob;
+          if (bankerCards === 3 && bankerTotal === 7) {
+            out.dragon7 += prob;
+            out.bankerDragon7Win += prob;
+          }
+          if (bankerTotal === 6 && bankerCards === 2) out.lucky6Two += prob;
+          if (bankerTotal === 6 && bankerCards === 3) out.lucky6Three += prob;
+        } else if (playerTotal > bankerTotal) {
+          out.playerWin += prob;
+          if (playerCards === 3 && playerTotal === 8) out.panda8 += prob;
+        } else {
+          out.tie += prob;
+        }
+      }
+
+      drawEach(counts, totalCards, (p1, p1Prob) => {
+        drawEach(counts, totalCards - 1, (b1, b1Prob) => {
+          drawEach(counts, totalCards - 2, (p2, p2Prob) => {
+            drawEach(counts, totalCards - 3, (b2, b2Prob) => {
+              const baseProb = p1Prob * b1Prob * p2Prob * b2Prob;
+              const playerTwo = (p1 + p2) % 10;
+              const bankerTwo = (b1 + b2) % 10;
+
+              if (playerTwo >= 8 || bankerTwo >= 8) {
+                settle(baseProb, playerTwo, bankerTwo, 2, 2);
+                return;
+              }
+
+              if (playerTwo <= 5) {
+                drawEach(counts, totalCards - 4, (p3, p3Prob) => {
+                  const playerFinal = (playerTwo + p3) % 10;
+                  const playerProb = baseProb * p3Prob;
+
+                  if (bankerDraws(bankerTwo, p3)) {
+                    drawEach(counts, totalCards - 5, (b3, b3Prob) => {
+                      settle(playerProb * b3Prob, playerFinal, (bankerTwo + b3) % 10, 3, 3);
+                    });
+                  } else {
+                    settle(playerProb, playerFinal, bankerTwo, 3, 2);
+                  }
+                });
+                return;
+              }
+
+              if (bankerTwo <= 5) {
+                drawEach(counts, totalCards - 4, (b3, b3Prob) => {
+                  settle(baseProb * b3Prob, playerTwo, (bankerTwo + b3) % 10, 2, 3);
+                });
+              } else {
+                settle(baseProb, playerTwo, bankerTwo, 2, 2);
+              }
+            });
+          });
+        });
+      });
+
+      return out;
+    }
+
+    function evSingle(probability, payout) {
+      return (payout + 1) * probability - 1;
+    }
+
+    function evLucky(probTwo, payTwo, probThree, payThree) {
+      return (payTwo + 1) * probTwo + (payThree + 1) * probThree - 1;
+    }
+
+    function pct(value, digits = 4) {
+      return `${(value * 100).toFixed(digits)}%`;
+    }
+
+    function evText(value) {
+      const sign = value >= 0 ? "+" : "";
+      return `${sign}${(value * 100).toFixed(3)}%`;
+    }
+
+    function currency(value) {
+      const n = Math.round(value);
+      return `${n >= 0 ? "+" : ""}${n.toLocaleString("zh-CN")}`;
+    }
+
+    function formatNumber(value, digits = 2) {
+      return Number(value).toLocaleString("zh-CN", {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits
+      });
+    }
+
+    function computeCounts(state) {
+      let dragonRc = 0;
+      let pandaRc = 0;
+      for (let i = 0; i < ranks.length; i += 1) {
+        const key = ranks[i].key;
+        dragonRc += state.seen[i] * dragonTags[key];
+        pandaRc += state.seen[i] * pandaTags[key];
+      }
+      const decksRemaining = Math.max(state.total / 52, 0.01);
+      const dragonTc = dragonRc / decksRemaining;
+      const pandaTc = pandaRc / decksRemaining;
+      return {
+        dragonRc,
+        pandaRc,
+        dragonTc,
+        pandaTc,
+        dragonTrigger: Math.floor(dragonTc) >= 4,
+        pandaTrigger: Math.floor(pandaTc) >= 11
+      };
+    }
+
+    function coverText(item, bankerCost) {
+      if (item.name === "庄主注") return item.effectiveEv > 0 ? "庄本身正EV" : "最低成本掩护";
+      if (item.effectiveEv <= 0 || bankerCost <= 0) return "不需要覆盖";
+      return `可覆盖约 ${formatNumber(item.effectiveEv / bankerCost, 1)} 倍庄掩护`;
+    }
+
+    function makeRow(item, buffer, unitBet, bankerCost) {
+      const ok = item.effectiveEv > buffer;
+      const rawClass = item.ev >= 0 ? "pos" : "neg";
+      const effectiveClass = item.effectiveEv >= 0 ? "pos" : "neg";
+      return `
+        <tr>
+          <td>${item.name}</td>
+          <td>${pct(item.probability)}</td>
+          <td class="${rawClass}">
+            ${evText(item.ev)}
+          </td>
+          <td class="${effectiveClass}">
+            ${evText(item.effectiveEv)}
+            <br><span class="fine">${currency(item.effectiveEv * unitBet)} / 每注</span>
+          </td>
+          <td>
+            <span class="decision ${ok ? "bet" : "pass"}">${ok ? "下注" : "不下"}</span>
+            <br><span class="fine">${coverText(item, bankerCost)}</span>
+          </td>
+        </tr>
+      `;
+    }
+
+    function updateBetCards(items, buffer, unitBet, rebate, bankerCost) {
+      const bets = items.filter(item => item.effectiveEv > buffer);
+      if (bets.length === 0) {
+        betList.innerHTML = `
+          <div class="bet-card">
+            <div class="name">没有正EV下注</div>
+            <div class="small">当前所有项目加返水后仍没有超过缓冲值。严格版：不下注，继续录牌。</div>
+            <div class="small">返水设置：${rebateModeLabel()} ${pct(rebate, 3)}；庄掩护成本：${pct(bankerCost, 3)} / 单位。</div>
+          </div>
+        `;
+        return;
+      }
+
+      betList.innerHTML = bets.map(item => `
+        <div class="bet-card good">
+          <div class="name">${item.name}</div>
+          <div class="ev">${evText(item.effectiveEv)}</div>
+          <div class="small">原始EV：${evText(item.ev)}；本项返水增益：+${pct(item.rebateEv, 3)}</div>
+          <div class="small">每注 ${Number(unitBet).toLocaleString("zh-CN")} 的理论EV：${currency(item.effectiveEv * unitBet)}</div>
+          <div class="small">${coverText(item, bankerCost)}</div>
+        </div>
+      `).join("");
+    }
+
+    function calculate() {
+      try {
+        showError("");
+        const state = getState();
+        const unitBet = Math.max(0, numberValue("unitBet", 100000));
+        const pairPay = numberValue("payPair", 11);
+        const dragonPay = numberValue("payDragon", 40);
+        const pandaPay = numberValue("payPanda", 25);
+        const tiePay = numberValue("payTie", 8);
+        const luckyTwoPay = numberValue("payLucky2", 12);
+        const luckyThreePay = numberValue("payLucky3", 20);
+        const rebate = appliedRebateRate / 100;
+        const rebateMode = document.getElementById("rebateMode").value;
+        const buffer = numberValue("edgeBuffer", 0) / 100;
+        const bankerRule = document.getElementById("bankerRule").value;
+
+        const pairProb = pairProbability(state.remainingRanks);
+        const probs = baccaratProbabilities(toValueCounts(state.remainingRanks));
+        const luckyProb = probs.lucky6Two + probs.lucky6Three;
+        const bankerEv = bankerRule === "standard"
+          ? 0.95 * probs.bankerWin - probs.playerWin
+          : (probs.bankerWin - probs.bankerDragon7Win) - probs.playerWin;
+        const playerEv = probs.playerWin - probs.bankerWin;
+
+        const items = [
+          { name: "庄主注", probability: probs.bankerWin, lossProbability: probs.playerWin, ev: bankerEv },
+          { name: "闲主注", probability: probs.playerWin, lossProbability: probs.bankerWin, ev: playerEv },
+          { name: "和局", probability: probs.tie, lossProbability: 1 - probs.tie, ev: evSingle(probs.tie, tiePay) },
+          { name: "闲对子", probability: pairProb, lossProbability: 1 - pairProb, ev: evSingle(pairProb, pairPay) },
+          { name: "庄对子", probability: pairProb, lossProbability: 1 - pairProb, ev: evSingle(pairProb, pairPay) },
+          { name: "龙7", probability: probs.dragon7, lossProbability: 1 - probs.dragon7, ev: evSingle(probs.dragon7, dragonPay) },
+          { name: "熊8", probability: probs.panda8, lossProbability: 1 - probs.panda8, ev: evSingle(probs.panda8, pandaPay) },
+          { name: "幸运6", probability: luckyProb, lossProbability: 1 - luckyProb, ev: evLucky(probs.lucky6Two, luckyTwoPay, probs.lucky6Three, luckyThreePay) }
+        ].map(item => ({
+          ...item,
+          rebateEv: rebateMode === "loss" ? rebate * item.lossProbability : rebate,
+          effectiveEv: item.ev + (rebateMode === "loss" ? rebate * item.lossProbability : rebate)
+        }));
+        const bankerItem = items.find(item => item.name === "庄主注");
+        const bankerCost = Math.max(0, -(bankerItem ? bankerItem.effectiveEv : 0));
+
+        resultBody.innerHTML = items.map(item => makeRow(item, buffer, unitBet, bankerCost)).join("");
+        updateBetCards(items, buffer, unitBet, rebate, bankerCost);
+
+        const seenTotal = state.seen.reduce((a, b) => a + b, 0);
+        document.getElementById("remainingCards").textContent = String(state.total);
+        document.getElementById("seenCards").textContent = String(seenTotal);
+        document.getElementById("dealtPct").textContent = pct(seenTotal / state.fullTotal, 1);
+        updateRebateSummary();
+        document.getElementById("calcStatus").textContent = `已按 ${state.total} 张剩余牌完成精确计算，已计入 ${pct(rebate, 3)} 返水（${rebateModeLabel()}）`;
+
+        const counts = computeCounts(state);
+        document.getElementById("dragonRc").textContent = counts.dragonRc.toFixed(0);
+        document.getElementById("dragonTc").textContent = counts.dragonTc.toFixed(2);
+        document.getElementById("pandaRc").textContent = counts.pandaRc.toFixed(0);
+        document.getElementById("pandaTc").textContent = counts.pandaTc.toFixed(2);
+        document.getElementById("dragonCountSignal").innerHTML = counts.dragonTrigger
+          ? `<span class="decision watch">TC触发</span> 但仍以返水后EV为最终下注标准`
+          : `TC整数未到 4，计数法不触发`;
+        document.getElementById("pandaCountSignal").innerHTML = counts.pandaTrigger
+          ? `<span class="decision watch">TC触发</span> 但仍以返水后EV为最终下注标准`
+          : `TC整数未到 11，计数法不触发`;
+        renderHandLog();
+        renderShoeTracker();
+      } catch (error) {
+        showError(error.message);
+        document.getElementById("calcStatus").textContent = "录入有误，请检查";
+        renderHandLog();
+        renderShoeTracker();
+      }
+    }
+
+    function applyQuickInput() {
+      const text = document.getElementById("quickInput").value.trim();
+      if (!text) return;
+      const parts = text.split(/[\s,，、;；]+/).filter(Boolean);
+      const added = [];
+
+      for (const part of parts) {
+        const match = part.match(/^([^:=xX*]+)(?:[:=xX*](\d+))?$/);
+        if (!match) {
+          showError(`无法识别：${part}`);
+          return;
+        }
+        const key = normalizeRank(match[1]);
+        if (!key) {
+          showError(`牌面无效：${match[1]}`);
+          return;
+        }
+        const amount = match[2] ? Number(match[2]) : 1;
+        if (!Number.isInteger(amount) || amount <= 0) {
+          showError(`数量无效：${part}`);
+          return;
+        }
+        added.push({ key, amount });
+      }
+
+      try {
+        validateAddition(added);
+      } catch (error) {
+        showError(error.message);
+        return;
+      }
+      for (const item of added) applyCardDelta(item.key, item.amount);
+      history.push({
+        type: "cards",
+        label: "快速加入",
+        cards: added
+      });
+      document.getElementById("quickInput").value = "";
+      calculate();
+    }
+
+    function undoLast() {
+      const last = history.pop();
+      if (!last) return;
+      undoEntry(last);
+      calculate();
+    }
+
+    function resetShoe() {
+      for (const rank of ranks) document.getElementById(`seen-${rank.key}`).value = "0";
+      history.length = 0;
+      clearDealInputs();
+      calculate();
+    }
+
+    initTelegramWebApp();
+    buildRankControls();
+    buildDealControls();
+    const calculationControlIds = [
+      "decks", "unitBet", "edgeBuffer", "bankerRule", "payPair",
+      "payDragon", "payPanda", "payTie", "payLucky2", "payLucky3",
+      "rebateMode"
+    ];
+    calculationControlIds.forEach(id => {
+      const control = document.getElementById(id);
+      control.addEventListener("input", scheduleCalculate);
+      control.addEventListener("change", calculateNow);
+    });
+    document.querySelectorAll(".rank-cell input").forEach(input => {
+      input.addEventListener("input", scheduleCalculate);
+      input.addEventListener("change", calculateNow);
+    });
+    document.getElementById("applyRebate").addEventListener("click", () => applyRebate());
+    document.getElementById("rebateRate").addEventListener("keydown", event => {
+      if (event.key === "Enter") applyRebate();
+    });
+    document.querySelectorAll(".rebate-preset").forEach(button => {
+      button.addEventListener("click", () => applyRebate(Number(button.dataset.rebate)));
+    });
+    document.getElementById("commitHand").addEventListener("click", commitHand);
+    document.getElementById("clearHand").addEventListener("click", clearDealInputs);
+    document.getElementById("undoHand").addEventListener("click", undoLastHand);
+    document.getElementById("applyQuick").addEventListener("click", applyQuickInput);
+    document.getElementById("quickInput").addEventListener("keydown", event => {
+      if (event.key === "Enter") applyQuickInput();
+    });
+    document.getElementById("undoLast").addEventListener("click", undoLast);
+    document.getElementById("resetSeen").addEventListener("click", resetShoe);
+    calculate();
+  </script>
+</body>
+</html>
