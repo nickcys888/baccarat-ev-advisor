@@ -334,62 +334,6 @@
       align-items: end;
     }
 
-    .hand-entry {
-      margin: 12px 0;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--soft);
-      padding: 12px;
-    }
-
-    .deal-grid {
-      display: grid;
-      grid-template-columns: repeat(6, minmax(74px, 1fr));
-      gap: 8px;
-    }
-
-    .deal-slot {
-      display: grid;
-      gap: 6px;
-    }
-
-    .deal-slot span {
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 780;
-    }
-
-    .hand-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 10px;
-    }
-
-    .hand-log {
-      display: grid;
-      gap: 6px;
-      margin-top: 10px;
-      max-height: 190px;
-      overflow: auto;
-    }
-
-    .hand-log-item {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      background: #fff;
-      padding: 7px 9px;
-      font-size: 13px;
-      line-height: 1.4;
-    }
-
-    .hand-log-item b {
-      white-space: nowrap;
-    }
-
     .shoe-tracker {
       margin-top: 16px;
       border-top: 1px solid var(--line);
@@ -442,87 +386,6 @@
       padding: 4px 7px;
     }
 
-    .road-grid {
-      display: grid;
-      grid-template-rows: repeat(6, 28px);
-      grid-auto-flow: column;
-      grid-auto-columns: 28px;
-      gap: 5px;
-      max-width: 100%;
-      overflow-x: auto;
-      padding-bottom: 4px;
-    }
-
-    .road-cell {
-      display: grid;
-      place-items: center;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      color: #fff;
-      font-size: 12px;
-      font-weight: 900;
-    }
-
-    .road-cell.banker { background: #dc2626; }
-    .road-cell.player { background: #2563eb; }
-    .road-cell.tie { background: #16a34a; }
-
-    .shoe-list {
-      margin-top: 12px;
-      max-height: 360px;
-      overflow: auto;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #fff;
-    }
-
-    .shoe-table th,
-    .shoe-table td {
-      font-size: 12px;
-      padding: 8px 6px;
-      vertical-align: top;
-    }
-
-    .shoe-table td:first-child,
-    .shoe-table th:first-child {
-      width: 50px;
-      text-align: center;
-      white-space: nowrap;
-    }
-
-    .result-badge {
-      display: inline-grid;
-      place-items: center;
-      min-width: 34px;
-      border-radius: 999px;
-      color: #fff;
-      padding: 3px 7px;
-      font-size: 12px;
-      font-weight: 900;
-    }
-
-    .result-badge.banker { background: #dc2626; }
-    .result-badge.player { background: #2563eb; }
-    .result-badge.tie { background: #16a34a; }
-
-    .side-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-      justify-content: flex-end;
-    }
-
-    .side-tag {
-      border-radius: 999px;
-      background: #eef2ff;
-      color: #3730a3;
-      padding: 2px 6px;
-      font-size: 11px;
-      font-weight: 850;
-      white-space: nowrap;
-    }
-
     button {
       min-height: 38px;
       border: 1px solid transparent;
@@ -541,6 +404,13 @@
 
     button:hover { filter: brightness(0.98); }
     button:active { transform: translateY(1px); }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+      filter: none;
+      transform: none;
+    }
 
     button.secondary {
       background: #edf3f6;
@@ -758,23 +628,9 @@
         gap: 6px;
       }
       .rank-btn { min-height: 52px; }
-      .deal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .hand-actions {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
-      .hand-actions button {
-        padding-inline: 6px;
-        white-space: normal;
-      }
-      .hand-log-item {
-        align-items: flex-start;
-        flex-direction: column;
-      }
       .quick button { width: 100%; }
       .metric { padding: 8px 6px; }
       .metric .v { font-size: 17px; }
-      .shoe-table { min-width: 560px; }
       th, td { padding: 8px 5px; font-size: 12px; }
     }
   </style>
@@ -921,18 +777,6 @@
 
         <div class="rank-buttons" id="rankButtons"></div>
 
-        <div class="hand-entry">
-          <h2>本局发牌顺序</h2>
-          <div id="dealGrid" class="deal-grid"></div>
-          <div class="hand-actions">
-            <button id="commitHand" type="button">提交本局</button>
-            <button id="clearHand" type="button" class="secondary">清空本局</button>
-            <button id="undoHand" type="button" class="secondary">撤销上一局</button>
-          </div>
-          <div class="fine">顺序固定：闲1、庄1、闲2、庄2、闲3、庄3。没有第三张就留空。burn card 用下面的快捷加入或牌面按钮录入。</div>
-          <div id="handLog" class="hand-log"></div>
-        </div>
-
         <label>已出牌数量（包含所有可见 burn card、庄闲所有发牌、第三张牌）</label>
         <div id="rankGrid" class="rank-grid"></div>
 
@@ -941,7 +785,7 @@
             <input id="quickInput" placeholder="例：A 8 9 K 或 A:2, 5:4, 10x3">
           </label>
           <button id="applyQuick" type="button">加入</button>
-          <button id="undoLast" type="button" class="secondary">撤销上一张/批次</button>
+          <button id="undoLastCard" type="button" class="secondary" disabled>撤销上一张牌</button>
           <button id="resetSeen" type="button" class="danger">新鞋清零</button>
         </div>
 
@@ -1013,14 +857,9 @@
             <span id="trackerStatus" class="fine">暂无记录</span>
           </div>
           <div class="tracker-block">
-            <div class="tracker-label">去掉的牌 / burn</div>
+            <div class="tracker-label">最近录入的牌</div>
             <div id="burnCards" class="burn-strip"></div>
           </div>
-          <div class="tracker-block">
-            <div class="tracker-label">路单</div>
-            <div id="roadmap" class="road-grid"></div>
-          </div>
-          <div id="shoeList" class="shoe-list"></div>
         </div>
       </aside>
     </div>
@@ -1043,29 +882,16 @@
       { key: "K", label: "K", value: 0 }
     ];
 
-    const dealSlots = [
-      { key: "P1", label: "闲1" },
-      { key: "B1", label: "庄1" },
-      { key: "P2", label: "闲2" },
-      { key: "B2", label: "庄2" },
-      { key: "P3", label: "闲3" },
-      { key: "B3", label: "庄3" }
-    ];
-
     const dragonTags = { A: 0, 2: 0, 3: 0, 4: -1, 5: -1, 6: -1, 7: -1, 8: 2, 9: 2, T: 0, J: 0, Q: 0, K: 0 };
     const pandaTags = { A: 1, 2: 1, 3: -2, 4: -2, 5: -2, 6: -1, 7: -1, 8: -2, 9: 4, T: 1, J: 1, Q: 1, K: 1 };
 
     const rankGrid = document.getElementById("rankGrid");
     const rankButtons = document.getElementById("rankButtons");
-    const dealGrid = document.getElementById("dealGrid");
-    const handLog = document.getElementById("handLog");
     const resultBody = document.getElementById("results");
     const betList = document.getElementById("betList");
     const errorBox = document.getElementById("error");
     const trackerStatus = document.getElementById("trackerStatus");
     const burnCards = document.getElementById("burnCards");
-    const roadmap = document.getElementById("roadmap");
-    const shoeList = document.getElementById("shoeList");
     const cutSummary = document.getElementById("cutSummary");
     const history = [];
     let appliedRebateRate = 0.7;
@@ -1118,20 +944,6 @@
           <input id="seen-${rank.key}" type="number" min="0" step="1" value="0" inputmode="numeric">
         `;
         rankGrid.appendChild(cell);
-      }
-    }
-
-    function buildDealControls() {
-      dealGrid.innerHTML = "";
-      const options = `<option value="">空</option>` + ranks.map(rank => `<option value="${rank.key}">${rank.label}</option>`).join("");
-      for (const slot of dealSlots) {
-        const wrap = document.createElement("label");
-        wrap.className = "deal-slot";
-        wrap.innerHTML = `
-          <span>${slot.label}</span>
-          <select id="deal-${slot.key}">${options}</select>
-        `;
-        dealGrid.appendChild(wrap);
       }
     }
 
@@ -1302,117 +1114,26 @@
       calculate();
     }
 
-    function baccaratTotal(keys) {
-      return keys.reduce((sum, key) => sum + rankValue(key), 0) % 10;
-    }
-
-    function cardsBySide(entry, side) {
-      return ["1", "2", "3"]
-        .map(n => entry.slots.find(slot => slot.slot === `${side}${n}`)?.key)
-        .filter(Boolean);
-    }
-
-    function formatCards(keys) {
-      return keys.length ? keys.map(rankLabel).join(" ") : "-";
-    }
-
-    function handSummary(entry) {
-      const player = cardsBySide(entry, "P");
-      const banker = cardsBySide(entry, "B");
-      const playerTotal = baccaratTotal(player);
-      const bankerTotal = baccaratTotal(banker);
-      const winner = playerTotal > bankerTotal ? "闲" : bankerTotal > playerTotal ? "庄" : "和";
-      const winnerClass = winner === "庄" ? "banker" : winner === "闲" ? "player" : "tie";
-      const tags = [];
-
-      if (player.length >= 2 && player[0] === player[1]) tags.push("闲对");
-      if (banker.length >= 2 && banker[0] === banker[1]) tags.push("庄对");
-      if (winner === "庄" && banker.length === 3 && bankerTotal === 7) tags.push("龙7");
-      if (winner === "闲" && player.length === 3 && playerTotal === 8) tags.push("熊8");
-      if (winner === "庄" && bankerTotal === 6) tags.push(`${banker.length === 2 ? "小" : "大"}幸运6`);
-      if (winner === "闲" && playerTotal === 7) tags.push(`${player.length === 2 ? "小" : "大"}幸运7`);
-      if (winner === "闲" && playerTotal === 7 && bankerTotal === 6) {
-        tags.push(`超级幸运7·${player.length + banker.length}张`);
-      }
-
-      return {
-        player,
-        banker,
-        playerTotal,
-        bankerTotal,
-        winner,
-        winnerClass,
-        tags
-      };
-    }
-
     function renderShoeTracker() {
-      const hands = history.filter(entry => entry.type === "hand");
-      const removed = history.filter(entry => entry.type === "cards" || entry.type === "cut");
+      const recorded = history.filter(entry => entry.type === "cards" || entry.type === "cut");
       const cutEntry = currentCutEntry();
-      const removedCount = removed.reduce((sum, entry) => sum + totalCardsInEntry(entry), 0)
-        + (cutEntry?.hiddenCount || 0);
       const historyTotal = history.reduce((sum, entry) => sum + totalCardsInEntry(entry), 0);
       const seenTotal = ranks.reduce((sum, rank) => sum + Math.max(0, Math.floor(numberValue(`seen-${rank.key}`, 0))), 0);
       const manualNote = seenTotal !== historyTotal ? "，数量表有手工修改" : "";
+      const recordedCount = recorded.reduce((sum, entry) => sum + totalCardsInEntry(entry), 0);
 
-      trackerStatus.textContent = `去牌${removedCount}张，已记录${hands.length}局${manualNote}`;
+      trackerStatus.textContent = `已录入${recordedCount}张可见牌${cutEntry?.hiddenCount ? `，另有${cutEntry.hiddenCount}张暗牌` : ""}${manualNote}`;
 
-      const burnItems = removed.flatMap(entry => entry.cards.map(card => ({
-        key: card.key,
-        amount: card.amount,
-        label: entry.label
-      })));
+      const burnItems = recorded.flatMap(entry => entry.cards.flatMap(card =>
+        Array.from({ length: card.amount }, () => ({ key: card.key, label: entry.label }))
+      ));
       burnCards.innerHTML = burnItems.length
-        ? burnItems.map(item => `<span class="rank-pill" title="${item.label}">${rankLabel(item.key)}${item.amount > 1 ? `×${item.amount}` : ""}</span>`).join("")
+        ? burnItems.slice(-40).map(item => `<span class="rank-pill" title="${item.label}">${rankLabel(item.key)}</span>`).join("")
           + (cutEntry?.hiddenCount ? `<span class="rank-pill" title="牌面未知，已计入剩余张数和TC分母">暗牌×${cutEntry.hiddenCount}</span>` : "")
-        : `<span class="fine">还没有单独录入去掉的牌。第一张 burn card 可用牌面按钮或快速加入录入。</span>`;
+        : `<span class="fine">还没有录入牌。点击上方牌面按钮即可开始。</span>`;
 
       renderCutSummary();
-
-      roadmap.innerHTML = hands.length
-        ? hands.map(entry => {
-          const summary = handSummary(entry);
-          return `<div class="road-cell ${summary.winnerClass}" title="第${entry.handNo}局：${summary.winner}">${summary.winner}</div>`;
-        }).join("")
-        : `<span class="fine">提交本局后自动生成。</span>`;
-
-      if (hands.length === 0) {
-        shoeList.innerHTML = `<div class="fine" style="padding: 10px;">暂无局记录。每提交一局，这里会按第一局、第二局、第三局继续排列。</div>`;
-        return;
-      }
-
-      shoeList.innerHTML = `
-        <table class="shoe-table">
-          <thead>
-            <tr>
-              <th>局</th>
-              <th>闲牌</th>
-              <th>庄牌</th>
-              <th>结果</th>
-              <th>触发</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${hands.map(entry => {
-              const summary = handSummary(entry);
-              return `
-                <tr>
-                  <td>第${entry.handNo}局</td>
-                  <td>${formatCards(summary.player)}<br><span class="fine">点数 ${summary.playerTotal}</span></td>
-                  <td>${formatCards(summary.banker)}<br><span class="fine">点数 ${summary.bankerTotal}</span></td>
-                  <td><span class="result-badge ${summary.winnerClass}">${summary.winner}</span></td>
-                  <td>
-                    <div class="side-tags">
-                      ${summary.tags.length ? summary.tags.map(tag => `<span class="side-tag">${tag}</span>`).join("") : `<span class="fine">-</span>`}
-                    </div>
-                  </td>
-                </tr>
-              `;
-            }).join("")}
-          </tbody>
-        </table>
-      `;
+      document.getElementById("undoLastCard").disabled = !history.some(entry => entry.type === "cards" && totalCardsInEntry(entry) > 0);
     }
 
     function applyCardDelta(key, amount) {
@@ -1451,81 +1172,11 @@
       }
     }
 
-    function nextHandNumber() {
-      return history.filter(entry => entry.type === "hand").length + 1;
-    }
-
-    function getDealSelection() {
-      return dealSlots.map(slot => ({
-        slot: slot.key,
-        slotLabel: slot.label,
-        key: document.getElementById(`deal-${slot.key}`).value
-      }));
-    }
-
-    function clearDealInputs() {
-      for (const slot of dealSlots) document.getElementById(`deal-${slot.key}`).value = "";
-    }
-
-    function commitHand() {
-      try {
-        showError("");
-        const slots = getDealSelection();
-        const firstFour = slots.slice(0, 4);
-        if (firstFour.some(slot => !slot.key)) {
-          throw new Error("本局至少要录入闲1、庄1、闲2、庄2。第三张没有就留空。");
-        }
-        const cards = slots
-          .filter(slot => slot.key)
-          .map(slot => ({ key: slot.key, amount: 1 }));
-        validateAddition(cards);
-        for (const card of cards) applyCardDelta(card.key, card.amount);
-        history.push({
-          type: "hand",
-          handNo: nextHandNumber(),
-          slots,
-          cards
-        });
-        clearDealInputs();
-        calculate();
-      } catch (error) {
-        showError(error.message);
-      }
-    }
-
     function undoEntry(entry) {
       if (!entry) return;
       for (let i = entry.cards.length - 1; i >= 0; i -= 1) {
         applyCardDelta(entry.cards[i].key, -entry.cards[i].amount);
       }
-    }
-
-    function undoLastHand() {
-      const index = history.findLastIndex(entry => entry.type === "hand");
-      if (index === -1) return;
-      const [entry] = history.splice(index, 1);
-      undoEntry(entry);
-      calculate();
-    }
-
-    function renderHandLog() {
-      const hands = history.filter(entry => entry.type === "hand");
-      if (hands.length === 0) {
-        handLog.innerHTML = `<div class="fine">暂无局记录。提交本局后，这里会按局回溯显示。</div>`;
-        return;
-      }
-      handLog.innerHTML = hands.slice(-8).reverse().map(entry => {
-        const text = dealSlots.map(slot => {
-          const found = entry.slots.find(item => item.slot === slot.key);
-          return `${slot.label}:${found?.key ? rankLabel(found.key) : "-"}`;
-        }).join("  ");
-        return `
-          <div class="hand-log-item">
-            <b>第${entry.handNo}局</b>
-            <span>${text}</span>
-          </div>
-        `;
-      }).join("");
     }
 
     function getState() {
@@ -1861,12 +1512,10 @@
         document.getElementById("pandaCountSignal").innerHTML = counts.pandaTrigger
           ? `<span class="decision watch">TC触发</span> 但仍以返水后EV为最终下注标准`
           : `TC整数未到 11，计数法不触发`;
-        renderHandLog();
         renderShoeTracker();
       } catch (error) {
         showError(error.message);
         document.getElementById("calcStatus").textContent = "录入有误，请检查";
-        renderHandLog();
         renderShoeTracker();
       }
     }
@@ -1912,10 +1561,16 @@
       calculate();
     }
 
-    function undoLast() {
-      const last = history.pop();
-      if (!last) return;
-      undoEntry(last);
+    function undoLastCard() {
+      const entryIndex = history.findLastIndex(entry => entry.type === "cards" && totalCardsInEntry(entry) > 0);
+      if (entryIndex === -1) return;
+      const entry = history[entryIndex];
+      const cardIndex = entry.cards.findLastIndex(card => card.amount > 0);
+      const card = entry.cards[cardIndex];
+      applyCardDelta(card.key, -1);
+      card.amount -= 1;
+      if (card.amount === 0) entry.cards.splice(cardIndex, 1);
+      if (entry.cards.length === 0) history.splice(entryIndex, 1);
       calculate();
     }
 
@@ -1925,13 +1580,11 @@
       document.getElementById("cutRank").value = "";
       document.getElementById("cutMode").value = "additional";
       document.getElementById("cutHiddenCount").value = "0";
-      clearDealInputs();
       calculate();
     }
 
     initTelegramWebApp();
     buildRankControls();
-    buildDealControls();
     const calculationControlIds = [
       "decks", "unitBet", "edgeBuffer", "bankerRule", "payPair",
       "payDragon", "payPanda", "payTie", "paySmallLucky6", "payBigLucky6",
@@ -1960,14 +1613,11 @@
     document.getElementById("cutHiddenCount").addEventListener("input", updateCutDraft);
     document.getElementById("applyCut").addEventListener("click", applyCutSetup);
     document.getElementById("undoCut").addEventListener("click", undoCutSetup);
-    document.getElementById("commitHand").addEventListener("click", commitHand);
-    document.getElementById("clearHand").addEventListener("click", clearDealInputs);
-    document.getElementById("undoHand").addEventListener("click", undoLastHand);
     document.getElementById("applyQuick").addEventListener("click", applyQuickInput);
     document.getElementById("quickInput").addEventListener("keydown", event => {
       if (event.key === "Enter") applyQuickInput();
     });
-    document.getElementById("undoLast").addEventListener("click", undoLast);
+    document.getElementById("undoLastCard").addEventListener("click", undoLastCard);
     document.getElementById("resetSeen").addEventListener("click", resetShoe);
     calculate();
   </script>
