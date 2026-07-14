@@ -217,6 +217,38 @@
       line-height: 1.45;
     }
 
+    .cut-panel {
+      margin-bottom: 14px;
+      padding: 14px 0;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .cut-panel h2 {
+      margin: 0 0 10px;
+    }
+
+    .cut-settings {
+      grid-template-columns: 1fr 1.4fr 0.8fr auto;
+      align-items: end;
+      margin-bottom: 8px;
+    }
+
+    .cut-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .cut-actions button {
+      flex: 1;
+    }
+
+    .cut-summary {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
     label {
       display: grid;
       gap: 6px;
@@ -804,6 +836,44 @@
           </div>
         </div>
 
+        <div class="cut-panel">
+          <h2>开牌 Cut / Burn</h2>
+          <div class="settings cut-settings">
+            <label>翻出的明牌
+              <select id="cutRank">
+                <option value="">未设置</option>
+                <option value="A">A</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+                <option value="9">9</option>
+                <option value="T">10</option>
+                <option value="J">J</option>
+                <option value="Q">Q</option>
+                <option value="K">K</option>
+              </select>
+            </label>
+            <label>切牌规则
+              <select id="cutMode">
+                <option value="additional" selected>明牌后再切 N 张</option>
+                <option value="inclusive">包含明牌共切 N 张</option>
+              </select>
+            </label>
+            <label>后续暗牌张数
+              <input id="cutHiddenCount" type="number" min="0" step="1" value="0" inputmode="numeric">
+            </label>
+            <div class="cut-actions">
+              <button id="applyCut" type="button">应用</button>
+              <button id="undoCut" type="button" class="secondary">撤销</button>
+            </div>
+          </div>
+          <div id="cutSummary" class="cut-summary">A按1，2–9按点数，10/J/Q/K按10。若后续牌可见，请把暗牌张数改为0，再用下方牌面按钮逐张录入。</div>
+        </div>
+
         <div class="settings">
           <label>庄主注规则
             <select id="bankerRule">
@@ -996,6 +1066,7 @@
     const burnCards = document.getElementById("burnCards");
     const roadmap = document.getElementById("roadmap");
     const shoeList = document.getElementById("shoeList");
+    const cutSummary = document.getElementById("cutSummary");
     const history = [];
     let appliedRebateRate = 0.7;
     let calculateTimer = null;
@@ -1132,6 +1203,105 @@
       return entry?.cards?.reduce((sum, card) => sum + card.amount, 0) || 0;
     }
 
+    function currentCutEntry() {
+      return history.find(entry => entry.type === "cut") || null;
+    }
+
+    function cutCardNumber(key) {
+      if (key === "A") return 1;
+      if (["2", "3", "4", "5", "6", "7", "8", "9"].includes(key)) return Number(key);
+      return key ? 10 : 0;
+    }
+
+    function suggestedHiddenCutCount() {
+      const indicated = cutCardNumber(document.getElementById("cutRank").value);
+      return document.getElementById("cutMode").value === "inclusive"
+        ? Math.max(0, indicated - 1)
+        : indicated;
+    }
+
+    function updateCutDraft() {
+      const key = document.getElementById("cutRank").value;
+      const hiddenCount = Math.max(0, Math.floor(numberValue("cutHiddenCount", 0)));
+      if (!key) {
+        cutSummary.textContent = "A按1，2–9按点数，10/J/Q/K按10。若后续牌可见，请把暗牌张数改为0，再用下方牌面按钮逐张录入。";
+        return;
+      }
+      cutSummary.textContent = `待应用：明牌 ${rankLabel(key)} 1张，后续暗牌 ${hiddenCount}张。使用这里后不要重复录入这张明牌。`;
+    }
+
+    function updateCutSuggestion() {
+      document.getElementById("cutHiddenCount").value = String(suggestedHiddenCutCount());
+      updateCutDraft();
+    }
+
+    function renderCutSummary() {
+      const entry = currentCutEntry();
+      if (!entry) {
+        updateCutDraft();
+        return;
+      }
+      const key = entry.cards[0]?.key || "";
+      const totalRemoved = totalCardsInEntry(entry) + entry.hiddenCount;
+      cutSummary.textContent = `已应用：明牌 ${rankLabel(key)} 1张 + 暗牌 ${entry.hiddenCount}张，共去掉 ${totalRemoved}张。暗牌牌面未知，EV按全部可能组成加权。`;
+    }
+
+    function applyCutSetup() {
+      try {
+        showError("");
+        const key = document.getElementById("cutRank").value;
+        const hiddenCount = Math.floor(numberValue("cutHiddenCount", 0));
+        if (!key) throw new Error("请先选择开牌时翻出的 Cut 明牌。");
+        if (!Number.isInteger(hiddenCount) || hiddenCount < 0) throw new Error("暗牌张数必须是0或正整数。");
+
+        const decks = Math.max(1, Math.floor(numberValue("decks", 8)));
+        const fullPerRank = decks * 4;
+        const fullTotal = decks * 52;
+        const existing = currentCutEntry();
+        const currentSeen = ranks.map(rank => Math.max(0, Math.floor(numberValue(`seen-${rank.key}`, 0))));
+        const rankIndex = ranks.findIndex(rank => rank.key === key);
+        const existingSameRank = existing?.cards?.filter(card => card.key === key)
+          .reduce((sum, card) => sum + card.amount, 0) || 0;
+        if (currentSeen[rankIndex] - existingSameRank + 1 > fullPerRank) {
+          throw new Error(`${rankLabel(key)} 已达到本鞋上限，无法应用 Cut 明牌。`);
+        }
+        const knownAfter = currentSeen.reduce((sum, count) => sum + count, 0)
+          - totalCardsInEntry(existing) + 1;
+        if (fullTotal - knownAfter - hiddenCount < 6) {
+          throw new Error("应用后实际剩余牌少于6张，无法完整发出一局。");
+        }
+
+        if (existing) {
+          const existingIndex = history.indexOf(existing);
+          history.splice(existingIndex, 1);
+          undoEntry(existing);
+        }
+        applyCardDelta(key, 1);
+        history.unshift({
+          type: "cut",
+          label: "开牌 Cut 明牌",
+          cards: [{ key, amount: 1 }],
+          hiddenCount,
+          mode: document.getElementById("cutMode").value
+        });
+        calculate();
+      } catch (error) {
+        showError(error.message);
+      }
+    }
+
+    function undoCutSetup() {
+      const entry = currentCutEntry();
+      if (entry) {
+        history.splice(history.indexOf(entry), 1);
+        undoEntry(entry);
+      }
+      document.getElementById("cutRank").value = "";
+      document.getElementById("cutMode").value = "additional";
+      document.getElementById("cutHiddenCount").value = "0";
+      calculate();
+    }
+
     function baccaratTotal(keys) {
       return keys.reduce((sum, key) => sum + rankValue(key), 0) % 10;
     }
@@ -1178,8 +1348,10 @@
 
     function renderShoeTracker() {
       const hands = history.filter(entry => entry.type === "hand");
-      const removed = history.filter(entry => entry.type === "cards");
-      const removedCount = removed.reduce((sum, entry) => sum + totalCardsInEntry(entry), 0);
+      const removed = history.filter(entry => entry.type === "cards" || entry.type === "cut");
+      const cutEntry = currentCutEntry();
+      const removedCount = removed.reduce((sum, entry) => sum + totalCardsInEntry(entry), 0)
+        + (cutEntry?.hiddenCount || 0);
       const historyTotal = history.reduce((sum, entry) => sum + totalCardsInEntry(entry), 0);
       const seenTotal = ranks.reduce((sum, rank) => sum + Math.max(0, Math.floor(numberValue(`seen-${rank.key}`, 0))), 0);
       const manualNote = seenTotal !== historyTotal ? "，数量表有手工修改" : "";
@@ -1193,7 +1365,10 @@
       })));
       burnCards.innerHTML = burnItems.length
         ? burnItems.map(item => `<span class="rank-pill" title="${item.label}">${rankLabel(item.key)}${item.amount > 1 ? `×${item.amount}` : ""}</span>`).join("")
+          + (cutEntry?.hiddenCount ? `<span class="rank-pill" title="牌面未知，已计入剩余张数和TC分母">暗牌×${cutEntry.hiddenCount}</span>` : "")
         : `<span class="fine">还没有单独录入去掉的牌。第一张 burn card 可用牌面按钮或快速加入录入。</span>`;
+
+      renderCutSummary();
 
       roadmap.innerHTML = hands.length
         ? hands.map(entry => {
@@ -1362,9 +1537,21 @@
       if (badIndex !== -1) {
         throw new Error(`${ranks[badIndex].label} 已出牌超过 ${fullPerRank} 张，请检查录入。`);
       }
-      const total = remainingRanks.reduce((a, b) => a + b, 0);
+      const probabilityPoolTotal = remainingRanks.reduce((a, b) => a + b, 0);
+      const unknownRemoved = currentCutEntry()?.hiddenCount || 0;
+      // Unknown burns lower penetration but stay in the probability pool to marginalize over every possible hidden composition.
+      const total = probabilityPoolTotal - unknownRemoved;
       if (total < 6) throw new Error("剩余牌少于 6 张，无法完整枚举一手百家乐。");
-      return { decks, fullPerRank, seen, remainingRanks, total, fullTotal: decks * 52 };
+      return {
+        decks,
+        fullPerRank,
+        seen,
+        remainingRanks,
+        probabilityPoolTotal,
+        unknownRemoved,
+        total,
+        fullTotal: decks * 52
+      };
     }
 
     function toValueCounts(rankCounts) {
@@ -1654,12 +1841,14 @@
         resultBody.innerHTML = items.map(item => makeRow(item, buffer, unitBet, bankerCost)).join("");
         updateBetCards(items, buffer, unitBet, rebate, bankerCost);
 
-        const seenTotal = state.seen.reduce((a, b) => a + b, 0);
+        const knownSeenTotal = state.seen.reduce((a, b) => a + b, 0);
+        const seenTotal = knownSeenTotal + state.unknownRemoved;
         document.getElementById("remainingCards").textContent = String(state.total);
         document.getElementById("seenCards").textContent = String(seenTotal);
         document.getElementById("dealtPct").textContent = pct(seenTotal / state.fullTotal, 1);
         updateRebateSummary();
-        document.getElementById("calcStatus").textContent = `已按 ${state.total} 张剩余牌完成精确计算，已计入 ${pct(rebate, 3)} 返水（${rebateModeLabel()}）`;
+        const cutStatus = state.unknownRemoved > 0 ? `，含${state.unknownRemoved}张未知暗牌` : "";
+        document.getElementById("calcStatus").textContent = `已按 ${state.total} 张实际剩余牌完成精确计算${cutStatus}，已计入 ${pct(rebate, 3)} 返水（${rebateModeLabel()}）`;
 
         const counts = computeCounts(state);
         document.getElementById("dragonRc").textContent = counts.dragonRc.toFixed(0);
@@ -1733,6 +1922,9 @@
     function resetShoe() {
       for (const rank of ranks) document.getElementById(`seen-${rank.key}`).value = "0";
       history.length = 0;
+      document.getElementById("cutRank").value = "";
+      document.getElementById("cutMode").value = "additional";
+      document.getElementById("cutHiddenCount").value = "0";
       clearDealInputs();
       calculate();
     }
@@ -1763,6 +1955,11 @@
     document.querySelectorAll(".rebate-preset").forEach(button => {
       button.addEventListener("click", () => applyRebate(Number(button.dataset.rebate)));
     });
+    document.getElementById("cutRank").addEventListener("change", updateCutSuggestion);
+    document.getElementById("cutMode").addEventListener("change", updateCutSuggestion);
+    document.getElementById("cutHiddenCount").addEventListener("input", updateCutDraft);
+    document.getElementById("applyCut").addEventListener("click", applyCutSetup);
+    document.getElementById("undoCut").addEventListener("click", undoCutSetup);
     document.getElementById("commitHand").addEventListener("click", commitHand);
     document.getElementById("clearHand").addEventListener("click", clearDealInputs);
     document.getElementById("undoHand").addEventListener("click", undoLastHand);
