@@ -758,6 +758,12 @@
           <label>大幸运6：庄3张6
             <input id="payBigLucky6" type="number" min="0" step="0.5" value="50">
           </label>
+          <label>综合幸运6：庄2张6
+            <input id="payCombinedLucky6Two" type="number" min="0" step="0.5" value="12">
+          </label>
+          <label>综合幸运6：庄3张6
+            <input id="payCombinedLucky6Three" type="number" min="0" step="0.5" value="20">
+          </label>
           <label>小幸运7：闲2张7
             <input id="paySmallLucky7" type="number" min="0" step="0.5" value="15">
           </label>
@@ -848,7 +854,7 @@
         </div>
 
         <div class="note">
-          对子按13个真实牌面分别计算；大小幸运6、大小幸运7分别独立计算；超级幸运7按4、5、6张三个赔付档位合并计算同一注EV。所有项目均按当前剩余牌完整枚举百家乐补牌规则。请按网站真实规则选择返水方式；平台不计和局、无效投注或部分旁注时，还需把对应比例折算后再输入。
+          对子按13个真实牌面分别计算；大小幸运6、大小幸运7分别独立计算；综合幸运6按庄两张6赔12、庄三张6赔20合并计算同一注EV；超级幸运7按4、5、6张三个赔付档位合并计算同一注EV。所有项目均按当前剩余牌完整枚举百家乐补牌规则。请按网站真实规则选择返水方式；平台不计和局、无效投注或部分旁注时，还需把对应比例折算后再输入。
         </div>
 
         <div class="shoe-tracker">
@@ -1440,6 +1446,8 @@
         const tiePay = numberValue("payTie", 8);
         const smallLucky6Pay = numberValue("paySmallLucky6", 22);
         const bigLucky6Pay = numberValue("payBigLucky6", 50);
+        const combinedLucky6TwoPay = numberValue("payCombinedLucky6Two", 12);
+        const combinedLucky6ThreePay = numberValue("payCombinedLucky6Three", 20);
         const smallLucky7Pay = numberValue("paySmallLucky7", 15);
         const bigLucky7Pay = numberValue("payBigLucky7", 30);
         const superLucky7FourPay = numberValue("paySuperLucky7Four", 30);
@@ -1469,6 +1477,15 @@
           { name: "熊8", probability: probs.panda8, lossProbability: 1 - probs.panda8, ev: evSingle(probs.panda8, pandaPay) },
           { name: "小幸运6", probability: probs.lucky6Two, lossProbability: 1 - probs.lucky6Two, ev: evSingle(probs.lucky6Two, smallLucky6Pay) },
           { name: "大幸运6", probability: probs.lucky6Three, lossProbability: 1 - probs.lucky6Three, ev: evSingle(probs.lucky6Three, bigLucky6Pay) },
+          {
+            name: "综合幸运6",
+            probability: bankerSixWin,
+            lossProbability: 1 - bankerSixWin,
+            ev: evTiered([
+              { probability: probs.lucky6Two, payout: combinedLucky6TwoPay },
+              { probability: probs.lucky6Three, payout: combinedLucky6ThreePay }
+            ])
+          },
           { name: "小幸运7", probability: probs.lucky7Two, lossProbability: 1 - probs.lucky7Two, ev: evSingle(probs.lucky7Two, smallLucky7Pay) },
           { name: "大幸运7", probability: probs.lucky7Three, lossProbability: 1 - probs.lucky7Three, ev: evSingle(probs.lucky7Three, bigLucky7Pay) },
           {
@@ -1588,6 +1605,7 @@
     const calculationControlIds = [
       "decks", "unitBet", "edgeBuffer", "bankerRule", "payPair",
       "payDragon", "payPanda", "payTie", "paySmallLucky6", "payBigLucky6",
+      "payCombinedLucky6Two", "payCombinedLucky6Three",
       "paySmallLucky7", "payBigLucky7", "paySuperLucky7Four",
       "paySuperLucky7Five", "paySuperLucky7Six",
       "rebateMode"
