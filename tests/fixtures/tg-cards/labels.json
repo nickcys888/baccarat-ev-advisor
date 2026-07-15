@@ -3,5 +3,50 @@
     "file": "sample-001.png",
     "player": ["3", "9", "4"],
     "banker": ["7", "4", "2"]
+  },
+  {
+    "file": "sample-002.png",
+    "player": ["9", "A"],
+    "banker": ["8", "J"]
+  },
+  {
+    "file": "sample-003.png",
+    "player": ["J", "6", "6"],
+    "banker": ["J", "J", "8"]
+  },
+  {
+    "file": "sample-004.png",
+    "player": ["6", "K"],
+    "banker": ["6", "K"]
+  },
+  {
+    "file": "sample-005.png",
+    "player": ["2", "5", "5"],
+    "banker": ["T", "3", "J"]
+  },
+  {
+    "file": "sample-006.png",
+    "player": ["7", "3", "Q"],
+    "banker": ["Q", "Q", "9"]
+  },
+  {
+    "file": "sample-007.png",
+    "player": ["8", "5", "9"],
+    "banker": ["A", "2"]
+  },
+  {
+    "file": "sample-008.png",
+    "player": ["4", "J", "4"],
+    "banker": ["9", "7"]
+  },
+  {
+    "file": "sample-009.png",
+    "player": ["5", "A"],
+    "banker": ["8", "3", "9"]
+  },
+  {
+    "file": "sample-010.png",
+    "player": ["3", "2"],
+    "banker": ["T", "8"]
   }
 ]

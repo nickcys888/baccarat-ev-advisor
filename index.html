@@ -1089,6 +1089,7 @@
     </div>
   </main>
 
+  <script src="vendor/tg-rank-templates.js"></script>
   <script>
     const ranks = [
       { key: "A", label: "A", value: 1 },
@@ -1132,7 +1133,7 @@
     let tgOcrWorkerPromise = null;
     let tgOcrBusy = false;
     let recognizedCommitted = false;
-    const TG_RANK_TEMPLATE_KEY = "baccarat-tg-rank-templates-v1";
+    const TG_RANK_TEMPLATE_KEY = "baccarat-tg-rank-templates-v2";
     const tgRecognitionSamples = new Map();
     let tgRankTemplates = loadRankTemplates();
 
@@ -1266,21 +1267,20 @@
 
     function fallbackCardBoxes(selection) {
       const region = normalizeRect(selection);
-      const cardHeight = region.height * 0.32;
-      const y = region.y + region.height * 0.60;
       const make = (fraction, horizontal = false) => {
-        const cardWidth = region.width * (horizontal ? 0.085 : 0.062);
+        const cardWidth = region.width * (horizontal ? 0.073 : 0.052);
+        const cardHeight = region.height * (horizontal ? 0.18 : 0.25);
         return {
-        x: region.x + region.width * fraction - cardWidth / 2,
-        y,
-        width: cardWidth,
-        height: cardHeight,
-        area: cardWidth * cardHeight
+          x: region.x + region.width * fraction - cardWidth / 2,
+          y: region.y + region.height * (horizontal ? 0.76 : 0.685),
+          width: cardWidth,
+          height: cardHeight,
+          area: cardWidth * cardHeight
         };
       };
       return {
-        player: [make(0.17, true), make(0.25), make(0.315)],
-        banker: [make(0.76), make(0.83), make(0.91, true)]
+        player: [make(0.116, true), make(0.203), make(0.274)],
+        banker: [make(0.728), make(0.799), make(0.881, true)]
       };
     }
 
@@ -1295,12 +1295,25 @@
           .sort((a, b) => b.box.area - a.box.area)
           .slice(0, 3)
           .sort((a, b) => a.box.x - b.box.x);
-        candidates.forEach((candidate, index) => jobs.push({
-          side,
-          index,
-          box: candidate.box,
-          cardRotation: candidate.evidence.rotation
-        }));
+        const hasHorizontalCard = candidates.some(candidate => candidate.box.width > candidate.box.height * 0.95);
+        const expectedCenters = side === "Player" ? [0.116, 0.203, 0.274] : [0.728, 0.799, 0.881];
+        const availableSlots = new Set([0, 1, 2]);
+        candidates.forEach((candidate, position) => {
+          let index = position;
+          if (hasHorizontalCard) {
+            index = [...availableSlots].sort((left, right) => {
+              const center = (candidate.box.x + candidate.box.width / 2 - region.x) / region.width;
+              return Math.abs(center - expectedCenters[left]) - Math.abs(center - expectedCenters[right]);
+            })[0];
+          }
+          availableSlots.delete(index);
+          jobs.push({
+            side,
+            index,
+            box: candidate.box,
+            cardRotation: candidate.evidence.rotation
+          });
+        });
       }
       return jobs;
     }
@@ -1421,7 +1434,7 @@
       }
       const paleRatio = palePixels / pixelCount;
       return {
-        valid: paleRatio >= 0.32 && rankInk >= 55 && suitInk >= 55,
+        valid: paleRatio >= 0.32 && rankInk >= 40 && suitInk >= 40,
         paleRatio,
         rankInk,
         suitInk
@@ -1457,10 +1470,10 @@
       rankContext.fillRect(0, 0, rank.width, rank.height);
       rankContext.drawImage(
         card,
-        card.width * 0.06,
-        card.height * 0.03,
-        card.width * 0.86,
-        card.height * 0.33,
+        card.width * 0.02,
+        card.height * 0.01,
+        card.width * 0.44,
+        card.height * 0.31,
         8,
         8,
         rank.width - 16,
@@ -1516,7 +1529,7 @@
         }
       }
       const filled = signature.reduce((sum, value) => sum + value, 0);
-      return filled >= 12 && filled <= signature.length * 0.62 ? signature : null;
+      return filled >= 6 && filled <= signature.length * 0.62 ? signature : null;
     }
 
     function signatureDistance(left, right) {
@@ -1528,13 +1541,42 @@
       return different / left.length;
     }
 
+    function decodeRankSignature(encoded) {
+      try {
+        const bytes = Uint8Array.from(atob(encoded), character => character.charCodeAt(0));
+        const signature = [];
+        for (let index = 0; index < 32 * 24; index += 1) {
+          signature.push((bytes[index >> 3] >> (7 - (index & 7))) & 1);
+        }
+        return signature;
+      } catch {
+        return null;
+      }
+    }
+
     function loadRankTemplates() {
+      const templates = {};
+      const presets = window.TG_PRESET_RANK_TEMPLATES || {};
+      for (const rank of ranks) {
+        templates[rank.key] = (presets[rank.key] || [])
+          .map(decodeRankSignature)
+          .filter(Boolean);
+      }
       try {
         const stored = JSON.parse(localStorage.getItem(TG_RANK_TEMPLATE_KEY) || "{}");
-        return stored && typeof stored === "object" ? stored : {};
+        if (stored && typeof stored === "object") {
+          for (const rank of ranks) {
+            for (const sample of stored[rank.key] || []) {
+              if (!Array.isArray(sample) || sample.length !== 32 * 24) continue;
+              if (!templates[rank.key].some(existing => signatureDistance(existing, sample) < 0.01))
+                templates[rank.key].push(sample);
+            }
+          }
+        }
       } catch {
-        return {};
+        // Preset templates still work when local storage is unavailable.
       }
+      return templates;
     }
 
     function saveRankTemplates() {
@@ -1568,7 +1610,7 @@
       const samples = tgRankTemplates[key] || [];
       if (samples.some(sample => signatureDistance(signature, sample) < 0.035)) return false;
       samples.push(signature);
-      tgRankTemplates[key] = samples.slice(-6);
+      tgRankTemplates[key] = samples.slice(-12);
       saveRankTemplates();
       return true;
     }
@@ -1612,6 +1654,12 @@
 
     function warmTgOcrWorker() {
       if (tgOcrWorker || tgOcrWorkerPromise) return;
+      const presetCount = Object.values(window.TG_PRESET_RANK_TEMPLATES || {})
+        .reduce((count, samples) => count + samples.length, 0);
+      if (presetCount) {
+        setImageReaderStatus("牌面快速模板已就绪，直接粘贴图片。", "可粘贴");
+        return;
+      }
       setImageReaderStatus("正在后台准备快速识别引擎…", "准备中");
       getTgOcrWorker()
         .then(() => {
@@ -1627,7 +1675,7 @@
       return rotationsForCardBox(job.side, box);
     }
 
-    async function recognizeCardOnce(worker, job) {
+    async function recognizeCardOnce(getWorker, job) {
       const candidateBoxes = job.fallbackBox ? [job.box, job.fallbackBox] : [job.box];
       const observations = [];
       let learningSample = null;
@@ -1645,12 +1693,21 @@
             learningSample = signature;
             learningSampleBox = boxIndex;
           }
-          const result = await worker.recognize(rankCanvas);
-          const key = normalizeOcrRank(result.data.text);
-          const confidence = Number(result.data.confidence || 0);
-          if (key) observations.push({ key, confidence, signature, boxIndex, source: "ocr" });
           const learned = matchLearnedRank(signature);
           if (learned) observations.push({ ...learned, signature, boxIndex, source: "learned" });
+          if (!learned || learned.confidence < 94) {
+            try {
+              const worker = await getWorker();
+              if (worker) {
+                const result = await worker.recognize(rankCanvas);
+                const key = normalizeOcrRank(result.data.text);
+                const confidence = Number(result.data.confidence || 0);
+                if (key) observations.push({ key, confidence, signature, boxIndex, source: "ocr" });
+              }
+            } catch {
+              // Keep any template match when OCR is unavailable, including on file:// pages.
+            }
+          }
         }
         const strongestPrimary = observations
           .filter(observation => observation.boxIndex === 0)
@@ -1720,11 +1777,21 @@
         };
         renderTgImage();
         clearRecognizedHand(false);
-        const worker = await getTgOcrWorker();
+        let worker = null;
+        let workerUnavailable = false;
+        const getWorker = async () => {
+          if (workerUnavailable) return null;
+          try {
+            if (!worker) worker = await getTgOcrWorker();
+          } catch {
+            workerUnavailable = true;
+          }
+          return worker;
+        };
         const recognized = [];
         for (let index = 0; index < jobs.length; index += 1) {
           setImageReaderStatus(`正在识别第${index + 1}/${jobs.length}张牌…`, "识别中");
-          recognized.push(await recognizeCardOnce(worker, jobs[index]));
+          recognized.push(await recognizeCardOnce(getWorker, jobs[index]));
         }
         let recognizedCount = 0;
         recognized.forEach((result, jobIndex) => {
