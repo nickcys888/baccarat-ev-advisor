@@ -1132,6 +1132,9 @@
     let tgOcrWorkerPromise = null;
     let tgOcrBusy = false;
     let recognizedCommitted = false;
+    const TG_RANK_TEMPLATE_KEY = "baccarat-tg-rank-templates-v1";
+    const tgRecognitionSamples = new Map();
+    let tgRankTemplates = loadRankTemplates();
 
     function buildRecognizedCardControls() {
       const options = ["<option value=\"\">—</option>"]
@@ -1147,6 +1150,7 @@
         select.addEventListener("change", () => {
           recognizedCommitted = false;
           select.dataset.confidence = "";
+          select.dataset.corrected = "1";
           updateRecognizedSummary();
         });
       });
@@ -1469,6 +1473,96 @@
       return rank;
     }
 
+    function makeRankSignature(canvas) {
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      const image = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      let minX = canvas.width;
+      let minY = canvas.height;
+      let maxX = -1;
+      let maxY = -1;
+      let inkCount = 0;
+      for (let y = 0; y < canvas.height; y += 1) {
+        for (let x = 0; x < canvas.width; x += 1) {
+          const offset = (y * canvas.width + x) * 4;
+          if (image[offset] >= 128) continue;
+          inkCount += 1;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+      if (inkCount < 80 || maxX <= minX || maxY <= minY) return null;
+      const width = maxX - minX + 1;
+      const height = maxY - minY + 1;
+      const signature = [];
+      const targetWidth = 32;
+      const targetHeight = 24;
+      for (let targetY = 0; targetY < targetHeight; targetY += 1) {
+        const sourceY = Math.min(maxY, Math.floor(minY + (targetY + 0.5) * height / targetHeight));
+        for (let targetX = 0; targetX < targetWidth; targetX += 1) {
+          const sourceX = Math.min(maxX, Math.floor(minX + (targetX + 0.5) * width / targetWidth));
+          signature.push(image[(sourceY * canvas.width + sourceX) * 4] < 128 ? 1 : 0);
+        }
+      }
+      const filled = signature.reduce((sum, value) => sum + value, 0);
+      return filled >= 12 && filled <= signature.length * 0.62 ? signature : null;
+    }
+
+    function signatureDistance(left, right) {
+      if (!left || !right || left.length !== right.length) return 1;
+      let different = 0;
+      for (let index = 0; index < left.length; index += 1) {
+        if (left[index] !== right[index]) different += 1;
+      }
+      return different / left.length;
+    }
+
+    function loadRankTemplates() {
+      try {
+        const stored = JSON.parse(localStorage.getItem(TG_RANK_TEMPLATE_KEY) || "{}");
+        return stored && typeof stored === "object" ? stored : {};
+      } catch {
+        return {};
+      }
+    }
+
+    function saveRankTemplates() {
+      try {
+        localStorage.setItem(TG_RANK_TEMPLATE_KEY, JSON.stringify(tgRankTemplates));
+      } catch {
+        // Recognition still works without local learning when storage is unavailable.
+      }
+    }
+
+    function matchLearnedRank(signature) {
+      if (!signature) return null;
+      const matches = [];
+      for (const rank of ranks) {
+        for (const sample of tgRankTemplates[rank.key] || []) {
+          matches.push({ key: rank.key, distance: signatureDistance(signature, sample) });
+        }
+      }
+      matches.sort((a, b) => a.distance - b.distance);
+      if (!matches.length || matches[0].distance > 0.18) return null;
+      const nextDifferent = matches.find(match => match.key !== matches[0].key);
+      if (nextDifferent && nextDifferent.distance - matches[0].distance < 0.035) return null;
+      return {
+        key: matches[0].key,
+        confidence: clamp(100 - matches[0].distance * 120, 0, 99)
+      };
+    }
+
+    function learnRankTemplate(key, signature) {
+      if (!key || !signature) return false;
+      const samples = tgRankTemplates[key] || [];
+      if (samples.some(sample => signatureDistance(signature, sample) < 0.035)) return false;
+      samples.push(signature);
+      tgRankTemplates[key] = samples.slice(-6);
+      saveRankTemplates();
+      return true;
+    }
+
     function normalizeOcrRank(text) {
       const clean = String(text || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
       if (clean.includes("10") || clean.includes("1O")) return "T";
@@ -1524,22 +1618,66 @@
     }
 
     async function recognizeCardOnce(worker, job) {
-      let best = { key: "", confidence: 0 };
       const candidateBoxes = job.fallbackBox ? [job.box, job.fallbackBox] : [job.box];
-      for (const box of candidateBoxes) {
+      const observations = [];
+      let learningSample = null;
+      let learningSampleBox = -1;
+      for (let boxIndex = 0; boxIndex < candidateBoxes.length; boxIndex += 1) {
+        const box = candidateBoxes[boxIndex];
         const preferred = preferredCardRotation(job.side, box);
         const rotations = box.width > box.height * 1.05 ? [preferred, -preferred] : [preferred];
         for (const rotation of rotations) {
-          const result = await worker.recognize(makeRankCanvas(box, rotation));
-          const candidate = {
-            key: normalizeOcrRank(result.data.text),
-            confidence: Number(result.data.confidence || 0)
-          };
-          if (candidate.key && candidate.confidence >= best.confidence) best = candidate;
-          if (best.confidence >= 55) return best;
+          const rankCanvas = makeRankCanvas(box, rotation);
+          const signature = makeRankSignature(rankCanvas);
+          if (signature && boxIndex > learningSampleBox) {
+            learningSample = signature;
+            learningSampleBox = boxIndex;
+          }
+          const result = await worker.recognize(rankCanvas);
+          const key = normalizeOcrRank(result.data.text);
+          const confidence = Number(result.data.confidence || 0);
+          if (key) observations.push({ key, confidence, signature, boxIndex, source: "ocr" });
+          const learned = matchLearnedRank(signature);
+          if (learned) observations.push({ ...learned, signature, boxIndex, source: "learned" });
         }
+        const strongestPrimary = observations
+          .filter(observation => observation.boxIndex === 0)
+          .sort((a, b) => b.confidence - a.confidence)[0];
+        if (boxIndex === 0 && strongestPrimary?.confidence >= 94) break;
       }
-      return best;
+      if (!observations.length) return { key: "", confidence: 0, signature: learningSample };
+
+      const grouped = new Map();
+      observations.forEach(observation => {
+        const group = grouped.get(observation.key) || {
+          key: observation.key,
+          confidence: 0,
+          crops: new Set(),
+          sources: new Set(),
+          signature: observation.signature
+        };
+        if (observation.confidence >= group.confidence) {
+          group.confidence = observation.confidence;
+          group.signature = observation.signature;
+        }
+        group.crops.add(observation.boxIndex);
+        group.sources.add(observation.source);
+        grouped.set(observation.key, group);
+      });
+      const ranked = [...grouped.values()].map(group => ({
+        ...group,
+        score: group.confidence + (group.crops.size > 1 ? 8 : 0) + (group.sources.size > 1 ? 4 : 0)
+      })).sort((a, b) => b.score - a.score);
+      const best = ranked[0];
+      const second = ranked[1];
+      const ambiguous = second && (best.score < 90 || best.score - second.score < 18);
+      const tooWeak = best.confidence < (second ? 72 : 78);
+      if (ambiguous || tooWeak) return { key: "", confidence: 0, signature: best.signature || learningSample };
+      return {
+        key: best.key,
+        confidence: Math.min(99, best.score),
+        signature: best.signature || learningSample
+      };
     }
 
     async function recognizeTgImage() {
@@ -1582,6 +1720,9 @@
           const select = document.getElementById(`recognized${job.side}${job.index + 1}`);
           select.value = result.key;
           select.dataset.confidence = result.key ? String(result.confidence) : "";
+          select.dataset.corrected = "";
+          if (result.signature) tgRecognitionSamples.set(select.id, result.signature);
+          else tgRecognitionSamples.delete(select.id);
           if (result.key) recognizedCount += 1;
         });
         updateRecognizedSummary();
@@ -1629,7 +1770,9 @@
       document.querySelectorAll("#recognizedPanel select").forEach(select => {
         select.value = "";
         select.dataset.confidence = "";
+        select.dataset.corrected = "";
       });
+      tgRecognitionSamples.clear();
       recognizedCommitted = false;
       if (update) updateRecognizedSummary();
     }
@@ -1649,6 +1792,13 @@
         setImageReaderStatus(error.message, "无法写入");
         return;
       }
+      let learnedCount = 0;
+      document.querySelectorAll("#recognizedPanel select").forEach(select => {
+        if (select.dataset.corrected === "1" && learnRankTemplate(select.value, tgRecognitionSamples.get(select.id))) {
+          learnedCount += 1;
+        }
+        select.dataset.corrected = "";
+      });
       for (const card of cards) applyCardDelta(card.key, 1);
       const playerTotal = player.reduce((sum, key) => sum + rankValue(key), 0) % 10;
       const bankerTotal = banker.reduce((sum, key) => sum + rankValue(key), 0) % 10;
@@ -1663,7 +1813,8 @@
       recognizedCommitted = true;
       calculate();
       updateRecognizedSummary();
-      setImageReaderStatus(`第${handNumber}局已写入：闲${playerTotal}点，庄${bankerTotal}点，${winner}胜。`, "已写入");
+      const learnedNote = learnedCount ? `，已学习${learnedCount}张修正牌面` : "";
+      setImageReaderStatus(`第${handNumber}局已写入：闲${playerTotal}点，庄${bankerTotal}点，${winner}胜${learnedNote}。`, "已写入");
     }
 
     function clearTgImage() {
