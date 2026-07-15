@@ -1453,7 +1453,7 @@
         });
         await worker.setParameters({
           tessedit_char_whitelist: "A2345678910JQK",
-          tessedit_pageseg_mode: Tesseract.PSM?.SINGLE_LINE || "7"
+          tessedit_pageseg_mode: Tesseract.PSM?.SINGLE_WORD || "8"
         });
         tgOcrWorker = worker;
         return worker;
@@ -1482,40 +1482,13 @@
       return side === "Player" ? 90 : -90;
     }
 
-    function ranksFromOcrText(text) {
-      return String(text || "").toUpperCase().match(/10|[AKQJ2-9]/g) || [];
-    }
-
-    async function recognizeCardStrip(worker, jobs) {
-      const slotWidth = 280;
-      const slotHeight = 180;
-      const strip = document.createElement("canvas");
-      strip.width = Math.max(slotWidth, jobs.length * slotWidth);
-      strip.height = slotHeight;
-      const context = strip.getContext("2d");
-      context.fillStyle = "white";
-      context.fillRect(0, 0, strip.width, strip.height);
-      jobs.forEach((job, index) => {
-        const rankCanvas = makeRankCanvas(job.box, preferredCardRotation(job.side, job.box));
-        context.drawImage(rankCanvas, index * slotWidth + 10, 5, slotWidth - 20, slotHeight - 10);
-      });
-
-      const result = await worker.recognize(strip);
-      const recognized = jobs.map(() => ({ key: "", confidence: 0 }));
-      const words = Array.isArray(result.data.words) ? result.data.words : [];
-      for (const word of words) {
-        const key = normalizeOcrRank(word.text);
-        if (!key || !word.bbox) continue;
-        const center = (word.bbox.x0 + word.bbox.x1) / 2;
-        const slot = clamp(Math.floor(center / slotWidth), 0, jobs.length - 1);
-        const confidence = Number(word.confidence || 0);
-        if (confidence >= recognized[slot].confidence) recognized[slot] = { key, confidence };
-      }
-
-      const fallback = ranksFromOcrText(result.data.text).map(normalizeRank).filter(Boolean);
-      if (!recognized.some(item => item.key) && fallback.length === jobs.length)
-        fallback.forEach((key, index) => { recognized[index] = { key, confidence: Number(result.data.confidence || 0) }; });
-      return recognized;
+    async function recognizeCardOnce(worker, job) {
+      const canvas = makeRankCanvas(job.box, preferredCardRotation(job.side, job.box));
+      const result = await worker.recognize(canvas);
+      return {
+        key: normalizeOcrRank(result.data.text),
+        confidence: Number(result.data.confidence || 0)
+      };
     }
 
     async function recognizeTgImage() {
@@ -1535,8 +1508,11 @@
         const jobs = [];
         for (const side of ["Player", "Banker"])
           boxes[side.toLowerCase()].slice(0, 3).forEach((box, index) => jobs.push({ side, index, box }));
-        setImageReaderStatus("正在一次识别整局牌面…", "识别中");
-        const recognized = await recognizeCardStrip(worker, jobs);
+        const recognized = [];
+        for (let index = 0; index < jobs.length; index += 1) {
+          setImageReaderStatus(`正在识别第${index + 1}/${jobs.length}张牌…`, "识别中");
+          recognized.push(await recognizeCardOnce(worker, jobs[index]));
+        }
         let recognizedCount = 0;
         recognized.forEach((result, jobIndex) => {
           const job = jobs[jobIndex];
