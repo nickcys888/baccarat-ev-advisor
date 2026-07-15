@@ -1213,47 +1213,6 @@
       return components;
     }
 
-    function findLikelyResultBand() {
-      const sourceWidth = tgSourceCanvas.width;
-      const sourceHeight = tgSourceCanvas.height;
-      const scale = Math.min(1, 700 / Math.max(sourceWidth, sourceHeight));
-      const analysis = document.createElement("canvas");
-      analysis.width = Math.max(1, Math.round(sourceWidth * scale));
-      analysis.height = Math.max(1, Math.round(sourceHeight * scale));
-      const context = analysis.getContext("2d", { willReadFrequently: true });
-      context.drawImage(tgSourceCanvas, 0, 0, analysis.width, analysis.height);
-      const pixels = context.getImageData(0, 0, analysis.width, analysis.height).data;
-      const mask = new Uint8Array(analysis.width * analysis.height);
-      for (let index = 0; index < mask.length; index += 1) {
-        const offset = index * 4;
-        const red = pixels[offset];
-        const green = pixels[offset + 1];
-        const blue = pixels[offset + 2];
-        mask[index] = red > 155 && red > green * 1.55 && red > blue * 1.25 && green < 145 ? 1 : 0;
-      }
-      const candidates = connectedComponents(mask, analysis.width, analysis.height)
-        .filter(component => {
-          const aspect = component.width / component.height;
-          const fill = component.area / (component.width * component.height);
-          return component.area >= 24 && component.width >= 7 && component.height >= 5
-            && aspect >= 0.75 && aspect <= 4.2 && fill >= 0.16;
-        })
-        .sort((a, b) => b.area * (b.area / (b.width * b.height)) - a.area * (a.area / (a.width * a.height)));
-      if (!candidates.length) return null;
-      const button = candidates[0];
-      const xScale = sourceWidth / analysis.width;
-      const yScale = sourceHeight / analysis.height;
-      const x = button.x * xScale;
-      const y = button.y * yScale;
-      const width = button.width * xScale;
-      const height = button.height * yScale;
-      const left = clamp(x - width * 3.15, 0, sourceWidth);
-      const top = clamp(y - height * 1.25, 0, sourceHeight);
-      const right = clamp(x + width * 4.15, 0, sourceWidth);
-      const bottom = clamp(y + height * 2.25, 0, sourceHeight);
-      return { x: left, y: top, width: right - left, height: bottom - top };
-    }
-
     function detectCardBoxes(selection) {
       const region = normalizeRect(selection);
       const targetWidth = Math.min(700, Math.max(280, Math.round(region.width)));
@@ -1395,7 +1354,7 @@
         tgImageCanvas.width = tgSourceCanvas.width;
         tgImageCanvas.height = tgSourceCanvas.height;
         tgSourceContext.drawImage(tgImageBitmap, 0, 0, tgSourceCanvas.width, tgSourceCanvas.height);
-        tgSelection = findLikelyResultBand() || { x: 0, y: 0, width: tgSourceCanvas.width, height: tgSourceCanvas.height };
+        tgSelection = { x: 0, y: 0, width: tgSourceCanvas.width, height: tgSourceCanvas.height };
         tgDetectedBoxes = detectCardBoxes(tgSelection);
         recognizedCommitted = false;
         document.getElementById("tgImageStage").classList.add("active");
