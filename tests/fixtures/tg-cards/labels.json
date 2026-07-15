@@ -48,5 +48,10 @@
     "file": "sample-010.png",
     "player": ["3", "2"],
     "banker": ["T", "8"]
+  },
+  {
+    "file": "sample-011.png",
+    "player": ["Q", "6", "5"],
+    "banker": ["A", "Q", "A"]
   }
 ]
