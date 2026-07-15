@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>百家乐正EV下注提示器</title>
   <script src="https://telegram.org/js/telegram-web-app.js?62"></script>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="vendor/tesseract.min.js?v=5.1.1"></script>
   <style>
     :root {
       color-scheme: light;
@@ -1394,6 +1394,9 @@
       if (tgOcrWorker) return tgOcrWorker;
       if (!window.Tesseract) throw new Error("识别引擎加载失败，请检查网络后重试。 ");
       tgOcrWorker = await Tesseract.createWorker("eng", 1, {
+        workerPath: new URL("vendor/tesseract-worker.min.js", window.location.href).href,
+        langPath: new URL("vendor/", window.location.href).href,
+        corePath: new URL("vendor/", window.location.href).href,
         logger: message => {
           if (message.status === "recognizing text")
             setImageReaderStatus(`正在识别牌面 ${Math.round((message.progress || 0) * 100)}%…`, "识别中");
