@@ -1327,33 +1327,21 @@
 
     function mapCardBoxesToSlots(boxes, selection) {
       const region = normalizeRect(selection);
-      const slotCenters = {
-        Player: [0.17, 0.25, 0.315],
-        Banker: [0.76, 0.83, 0.91]
-      };
       const jobs = [];
       for (const side of ["Player", "Banker"]) {
-        const chosen = new Map();
-        for (const box of boxes[side.toLowerCase()]) {
-          const center = (box.x + box.width / 2 - region.x) / region.width;
-          let nearestIndex = -1;
-          let nearestDistance = Infinity;
-          slotCenters[side].forEach((target, index) => {
-            const distance = Math.abs(center - target);
-            if (distance < nearestDistance) {
-              nearestIndex = index;
-              nearestDistance = distance;
-            }
-          });
-          if (nearestDistance > 0.065) continue;
-          const existing = chosen.get(nearestIndex);
-          if (!existing || nearestDistance < existing.distance) {
-            chosen.set(nearestIndex, { side, index: nearestIndex, box, distance: nearestDistance });
-          }
-        }
-        for (let index = 0; index < 3; index += 1) {
-          if (chosen.has(index)) jobs.push(chosen.get(index));
-        }
+        const candidates = boxes[side.toLowerCase()]
+          .filter(box => box.y + box.height / 2 > region.y + region.height * 0.52)
+          .map(box => ({ box, evidence: inspectBoxAsCard(side, box) }))
+          .filter(candidate => candidate.evidence.valid)
+          .sort((a, b) => b.box.area - a.box.area)
+          .slice(0, 3)
+          .sort((a, b) => a.box.x - b.box.x);
+        candidates.forEach((candidate, index) => jobs.push({
+          side,
+          index,
+          box: candidate.box,
+          cardRotation: candidate.evidence.rotation
+        }));
       }
       return jobs;
     }
@@ -1479,6 +1467,26 @@
         rankInk,
         suitInk
       };
+    }
+
+    function rotationsForCardBox(side, box) {
+      if (box.width <= box.height * 0.95) return [0];
+      return side === "Player" ? [90, -90] : [-90, 90];
+    }
+
+    function inspectBoxAsCard(side, box) {
+      let best = { valid: false, paleRatio: 0, rankInk: 0, suitInk: 0, rotation: 0 };
+      for (const rotation of rotationsForCardBox(side, box)) {
+        const evidence = inspectCardFace(makePortraitCardCanvas(box, rotation));
+        const score = evidence.paleRatio
+          + Math.min(evidence.rankInk, 240) / 1200
+          + Math.min(evidence.suitInk, 240) / 1200;
+        const bestScore = best.paleRatio
+          + Math.min(best.rankInk, 240) / 1200
+          + Math.min(best.suitInk, 240) / 1200;
+        if (evidence.valid && (!best.valid || score > bestScore)) best = { ...evidence, rotation };
+      }
+      return best;
     }
 
     function makeRankCanvasFromCard(card) {
@@ -1655,10 +1663,9 @@
         });
     }
 
-    function cardRotationsForJob(job) {
-      if (job.side === "Player" && job.index === 0) return [90, -90];
-      if (job.side === "Banker" && job.index === 2) return [-90, 90];
-      return [0];
+    function cardRotationsForJob(job, box) {
+      if (box === job.box && Number.isFinite(job.cardRotation)) return [job.cardRotation];
+      return rotationsForCardBox(job.side, box);
     }
 
     async function recognizeCardOnce(worker, job) {
@@ -1668,7 +1675,7 @@
       let learningSampleBox = -1;
       for (let boxIndex = 0; boxIndex < candidateBoxes.length; boxIndex += 1) {
         const box = candidateBoxes[boxIndex];
-        const rotations = cardRotationsForJob(job);
+        const rotations = cardRotationsForJob(job, box);
         for (const rotation of rotations) {
           const cardCanvas = makePortraitCardCanvas(box, rotation);
           const evidence = inspectCardFace(cardCanvas);
