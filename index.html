@@ -1304,8 +1304,8 @@
     function fallbackCardBoxes(selection) {
       const region = normalizeRect(selection);
       const cardWidth = region.width * 0.062;
-      const cardHeight = region.height * 0.37;
-      const y = region.y + region.height * 0.54;
+      const cardHeight = region.height * 0.32;
+      const y = region.y + region.height * 0.60;
       const make = fractions => fractions.map(fraction => ({
         x: region.x + region.width * fraction - cardWidth / 2,
         y,
