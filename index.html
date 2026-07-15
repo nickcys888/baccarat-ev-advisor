@@ -1524,17 +1524,20 @@
     }
 
     async function recognizeCardOnce(worker, job) {
-      const preferred = preferredCardRotation(job.side, job.box);
-      const rotations = job.box.width > job.box.height * 1.05 ? [preferred, -preferred] : [preferred];
       let best = { key: "", confidence: 0 };
-      for (const rotation of rotations) {
-        const result = await worker.recognize(makeRankCanvas(job.box, rotation));
-        const candidate = {
-          key: normalizeOcrRank(result.data.text),
-          confidence: Number(result.data.confidence || 0)
-        };
-        if (candidate.key && candidate.confidence >= best.confidence) best = candidate;
-        if (best.confidence >= 55) break;
+      const candidateBoxes = job.fallbackBox ? [job.box, job.fallbackBox] : [job.box];
+      for (const box of candidateBoxes) {
+        const preferred = preferredCardRotation(job.side, box);
+        const rotations = box.width > box.height * 1.05 ? [preferred, -preferred] : [preferred];
+        for (const rotation of rotations) {
+          const result = await worker.recognize(makeRankCanvas(box, rotation));
+          const candidate = {
+            key: normalizeOcrRank(result.data.text),
+            confidence: Number(result.data.confidence || 0)
+          };
+          if (candidate.key && candidate.confidence >= best.confidence) best = candidate;
+          if (best.confidence >= 55) return best;
+        }
       }
       return best;
     }
@@ -1553,7 +1556,11 @@
         );
         const fallbackJobs = mapCardBoxesToSlots(fallbackCardBoxes(tgSelection), tgSelection);
         const jobsBySlot = new Map(fallbackJobs.map(job => [`${job.side}-${job.index}`, job]));
-        detectedJobs.forEach(job => jobsBySlot.set(`${job.side}-${job.index}`, job));
+        detectedJobs.forEach(job => {
+          const key = `${job.side}-${job.index}`;
+          const fallbackJob = jobsBySlot.get(key);
+          jobsBySlot.set(key, { ...job, fallbackBox: fallbackJob?.box });
+        });
         const jobs = [...jobsBySlot.values()].sort((a, b) =>
           (a.side === b.side ? 0 : a.side === "Player" ? -1 : 1) || a.index - b.index
         );
