@@ -1307,19 +1307,21 @@
 
     function fallbackCardBoxes(selection) {
       const region = normalizeRect(selection);
-      const cardWidth = region.width * 0.062;
       const cardHeight = region.height * 0.32;
       const y = region.y + region.height * 0.60;
-      const make = fractions => fractions.map(fraction => ({
+      const make = (fraction, horizontal = false) => {
+        const cardWidth = region.width * (horizontal ? 0.085 : 0.062);
+        return {
         x: region.x + region.width * fraction - cardWidth / 2,
         y,
         width: cardWidth,
         height: cardHeight,
         area: cardWidth * cardHeight
-      }));
+        };
+      };
       return {
-        player: make([0.17, 0.25, 0.315]),
-        banker: make([0.76, 0.83, 0.91])
+        player: [make(0.17, true), make(0.25), make(0.315)],
+        banker: [make(0.76), make(0.83), make(0.91, true)]
       };
     }
 
@@ -1420,7 +1422,7 @@
       }
     }
 
-    function makeRankCanvas(box, rotation) {
+    function makePortraitCardCanvas(box, rotation) {
       const card = document.createElement("canvas");
       const portraitWidth = Math.max(80, Math.round(rotation % 180 === 0 ? box.width : box.height));
       const portraitHeight = Math.max(110, Math.round(rotation % 180 === 0 ? box.height : box.width));
@@ -1438,7 +1440,48 @@
       const drawWidth = rotation % 180 === 0 ? card.width : card.height;
       const drawHeight = rotation % 180 === 0 ? card.height : card.width;
       cardContext.drawImage(full, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+      return card;
+    }
 
+    function inspectCardFace(card) {
+      const context = card.getContext("2d", { willReadFrequently: true });
+      const image = context.getImageData(0, 0, card.width, card.height).data;
+      let palePixels = 0;
+      let rankInk = 0;
+      let suitInk = 0;
+      const pixelCount = card.width * card.height;
+      const cornerRight = Math.max(1, Math.floor(card.width * 0.38));
+      const rankTop = Math.floor(card.height * 0.02);
+      const rankBottom = Math.floor(card.height * 0.21);
+      const suitTop = Math.floor(card.height * 0.24);
+      const suitBottom = Math.floor(card.height * 0.49);
+      for (let y = 0; y < card.height; y += 1) {
+        for (let x = 0; x < card.width; x += 1) {
+          const offset = (y * card.width + x) * 4;
+          const red = image[offset];
+          const green = image[offset + 1];
+          const blue = image[offset + 2];
+          const high = Math.max(red, green, blue);
+          const low = Math.min(red, green, blue);
+          if (low > 145 && high - low < 95) palePixels += 1;
+          if (x < 2 || x >= cornerRight) continue;
+          const luminance = red * 0.299 + green * 0.587 + blue * 0.114;
+          const ink = luminance < 145 || (red > 115 && red > green * 1.3 && red > blue * 1.15);
+          if (!ink) continue;
+          if (y >= rankTop && y < rankBottom) rankInk += 1;
+          if (y >= suitTop && y < suitBottom) suitInk += 1;
+        }
+      }
+      const paleRatio = palePixels / pixelCount;
+      return {
+        valid: paleRatio >= 0.32 && rankInk >= 55 && suitInk >= 55,
+        paleRatio,
+        rankInk,
+        suitInk
+      };
+    }
+
+    function makeRankCanvasFromCard(card) {
       const rank = document.createElement("canvas");
       rank.width = 260;
       rank.height = 170;
@@ -1612,9 +1655,10 @@
         });
     }
 
-    function preferredCardRotation(side, box) {
-      if (box.width <= box.height * 1.05) return 0;
-      return side === "Player" ? 90 : -90;
+    function cardRotationsForJob(job) {
+      if (job.side === "Player" && job.index === 0) return [90, -90];
+      if (job.side === "Banker" && job.index === 2) return [-90, 90];
+      return [0];
     }
 
     async function recognizeCardOnce(worker, job) {
@@ -1624,10 +1668,12 @@
       let learningSampleBox = -1;
       for (let boxIndex = 0; boxIndex < candidateBoxes.length; boxIndex += 1) {
         const box = candidateBoxes[boxIndex];
-        const preferred = preferredCardRotation(job.side, box);
-        const rotations = box.width > box.height * 1.05 ? [preferred, -preferred] : [preferred];
+        const rotations = cardRotationsForJob(job);
         for (const rotation of rotations) {
-          const rankCanvas = makeRankCanvas(box, rotation);
+          const cardCanvas = makePortraitCardCanvas(box, rotation);
+          const evidence = inspectCardFace(cardCanvas);
+          if (!evidence.valid) continue;
+          const rankCanvas = makeRankCanvasFromCard(cardCanvas);
           const signature = makeRankSignature(rankCanvas);
           if (signature && boxIndex > learningSampleBox) {
             learningSample = signature;
