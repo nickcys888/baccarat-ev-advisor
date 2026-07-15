@@ -1304,8 +1304,8 @@
     function fallbackCardBoxes(selection) {
       const region = normalizeRect(selection);
       const cardWidth = region.width * 0.062;
-      const cardHeight = region.height * 0.60;
-      const y = region.y + region.height * 0.42;
+      const cardHeight = region.height * 0.37;
+      const y = region.y + region.height * 0.54;
       const make = fractions => fractions.map(fraction => ({
         x: region.x + region.width * fraction - cardWidth / 2,
         y,
@@ -1314,16 +1314,16 @@
         area: cardWidth * cardHeight
       }));
       return {
-        player: make([0.17, 0.25, 0.33]),
-        banker: make([0.74, 0.82, 0.90])
+        player: make([0.17, 0.25, 0.315]),
+        banker: make([0.76, 0.83, 0.91])
       };
     }
 
     function mapCardBoxesToSlots(boxes, selection) {
       const region = normalizeRect(selection);
       const slotCenters = {
-        Player: [0.17, 0.25, 0.33],
-        Banker: [0.74, 0.82, 0.90]
+        Player: [0.17, 0.25, 0.315],
+        Banker: [0.76, 0.83, 0.91]
       };
       const jobs = [];
       for (const side of ["Player", "Banker"]) {
