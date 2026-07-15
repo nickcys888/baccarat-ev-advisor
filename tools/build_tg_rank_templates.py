@@ -8,7 +8,7 @@ from PIL import Image
 from check_tg_card_boxes import FIXTURES, ROOT, card_face_evidence, detect_cards
 
 
-OUTPUT = ROOT / "vendor" / "tg-rank-templates.js"
+OUTPUT = ROOT / "vendor" / "card-patterns-v2.js"
 TARGET_WIDTH = 32
 TARGET_HEIGHT = 24
 
