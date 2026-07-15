@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>百家乐正EV下注提示器</title>
   <script src="https://telegram.org/js/telegram-web-app.js?62"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     :root {
       color-scheme: light;
@@ -248,6 +249,131 @@
       font-size: 12px;
       line-height: 1.5;
     }
+
+    .image-reader {
+      margin: 14px 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--soft);
+      padding: 12px;
+    }
+
+    .image-reader-head,
+    .image-reader-actions,
+    .recognized-head,
+    .recognized-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .image-reader-head h2 { margin: 0; }
+
+    .image-reader-actions {
+      margin-top: 10px;
+      justify-content: flex-start;
+    }
+
+    .file-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 8px 13px;
+      border-radius: 6px;
+      background: var(--accent);
+      color: var(--accent-text);
+      font-weight: 750;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .file-button input { display: none; }
+
+    .image-stage {
+      display: none;
+      position: relative;
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+      background: #111827;
+      touch-action: none;
+    }
+
+    .image-stage.active { display: block; }
+
+    #tgImageCanvas {
+      display: block;
+      width: 100%;
+      max-height: 330px;
+      object-fit: contain;
+      cursor: crosshair;
+    }
+
+    .image-reader-status {
+      margin-top: 9px;
+      min-height: 20px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .recognized-panel {
+      display: none;
+      margin-top: 10px;
+      border-top: 1px solid var(--line);
+      padding-top: 10px;
+    }
+
+    .recognized-panel.active { display: block; }
+
+    .recognized-sides {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 9px;
+    }
+
+    .recognized-side {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--panel);
+      padding: 9px;
+    }
+
+    .recognized-side.player { border-top: 3px solid #2563eb; }
+    .recognized-side.banker { border-top: 3px solid #dc2626; }
+
+    .recognized-head strong { font-size: 14px; }
+
+    .recognized-cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 7px;
+    }
+
+    .recognized-cards select {
+      width: 100%;
+      min-width: 0;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .recognized-summary {
+      margin-top: 10px;
+      padding: 9px 10px;
+      border-radius: 6px;
+      background: var(--blue-bg);
+      color: #1e3a8a;
+      font-weight: 750;
+    }
+
+    .confidence-low { color: var(--warn); }
+    .confidence-ok { color: var(--good); }
 
     label {
       display: grid;
@@ -629,6 +755,9 @@
       }
       .rank-btn { min-height: 52px; }
       .quick button { width: 100%; }
+      .image-reader-actions button,
+      .image-reader-actions .file-button { width: 100%; }
+      .recognized-sides { grid-template-columns: 1fr; }
       .metric { padding: 8px 6px; }
       .metric .v { font-size: 17px; }
       th, td { padding: 8px 5px; font-size: 12px; }
@@ -728,6 +857,50 @@
             </div>
           </div>
           <div id="cutSummary" class="cut-summary">A按1，2–9按点数，10/J/Q/K按10。若后续牌可见，请把暗牌张数改为0，再用下方牌面按钮逐张录入。</div>
+        </div>
+
+        <div id="imageReader" class="image-reader">
+          <div class="image-reader-head">
+            <h2>TG截图识牌</h2>
+            <span id="imageReaderBadge" class="fine">等待截图</span>
+          </div>
+          <div class="image-reader-actions">
+            <label class="file-button" title="选择TG中的本局结果截图">
+              选择截图
+              <input id="tgImageInput" type="file" accept="image/png,image/jpeg,image/webp" capture="environment">
+            </label>
+            <button id="pasteTgImage" type="button" class="secondary" title="读取剪贴板中的截图">粘贴截图</button>
+            <button id="recognizeTgImage" type="button" disabled>识别牌面</button>
+            <button id="clearTgImage" type="button" class="secondary" disabled>清除</button>
+          </div>
+          <div id="tgImageStage" class="image-stage">
+            <canvas id="tgImageCanvas" aria-label="TG截图识别区域"></canvas>
+          </div>
+          <div id="imageReaderStatus" class="image-reader-status">截图只在当前设备处理。</div>
+
+          <div id="recognizedPanel" class="recognized-panel">
+            <div class="recognized-sides">
+              <div class="recognized-side player">
+                <div class="recognized-head">
+                  <strong>闲家</strong>
+                  <span id="recognizedPlayerTotal" class="fine">未完整</span>
+                </div>
+                <div id="recognizedPlayerCards" class="recognized-cards"></div>
+              </div>
+              <div class="recognized-side banker">
+                <div class="recognized-head">
+                  <strong>庄家</strong>
+                  <span id="recognizedBankerTotal" class="fine">未完整</span>
+                </div>
+                <div id="recognizedBankerCards" class="recognized-cards"></div>
+              </div>
+            </div>
+            <div id="recognizedSummary" class="recognized-summary">请核对牌面</div>
+            <div class="image-reader-actions">
+              <button id="commitRecognizedHand" type="button" disabled>确认写入本局</button>
+              <button id="resetRecognizedHand" type="button" class="secondary">清空识别结果</button>
+            </div>
+          </div>
         </div>
 
         <div class="settings">
@@ -899,9 +1072,491 @@
     const trackerStatus = document.getElementById("trackerStatus");
     const burnCards = document.getElementById("burnCards");
     const cutSummary = document.getElementById("cutSummary");
+    const tgImageCanvas = document.getElementById("tgImageCanvas");
+    const tgImageContext = tgImageCanvas.getContext("2d", { willReadFrequently: true });
+    const tgSourceCanvas = document.createElement("canvas");
+    const tgSourceContext = tgSourceCanvas.getContext("2d", { willReadFrequently: true });
     const history = [];
     let appliedRebateRate = 0.7;
     let calculateTimer = null;
+    let tgImageBitmap = null;
+    let tgSelection = null;
+    let tgDragStart = null;
+    let tgDetectedBoxes = { player: [], banker: [] };
+    let tgOcrWorker = null;
+    let recognizedCommitted = false;
+
+    function buildRecognizedCardControls() {
+      const options = ["<option value=\"\">—</option>"]
+        .concat(ranks.map(rank => `<option value="${rank.key}">${rank.label}</option>`))
+        .join("");
+      for (const side of ["Player", "Banker"]) {
+        const container = document.getElementById(`recognized${side}Cards`);
+        container.innerHTML = Array.from({ length: 3 }, (_, index) =>
+          `<select id="recognized${side}${index + 1}" aria-label="${side === "Player" ? "闲" : "庄"}家第${index + 1}张牌">${options}</select>`
+        ).join("");
+      }
+      document.querySelectorAll("#recognizedPanel select").forEach(select => {
+        select.addEventListener("change", () => {
+          recognizedCommitted = false;
+          select.dataset.confidence = "";
+          updateRecognizedSummary();
+        });
+      });
+    }
+
+    function setImageReaderStatus(message, badge = "处理中") {
+      document.getElementById("imageReaderStatus").textContent = message;
+      document.getElementById("imageReaderBadge").textContent = badge;
+    }
+
+    function clamp(value, minimum, maximum) {
+      return Math.max(minimum, Math.min(maximum, value));
+    }
+
+    function normalizeRect(rect) {
+      const x = Math.min(rect.x, rect.x + rect.width);
+      const y = Math.min(rect.y, rect.y + rect.height);
+      return {
+        x,
+        y,
+        width: Math.abs(rect.width),
+        height: Math.abs(rect.height)
+      };
+    }
+
+    function connectedComponents(mask, width, height) {
+      const visited = new Uint8Array(mask.length);
+      const components = [];
+      const stack = [];
+      for (let start = 0; start < mask.length; start += 1) {
+        if (!mask[start] || visited[start]) continue;
+        visited[start] = 1;
+        stack.push(start);
+        let area = 0;
+        let minX = width;
+        let maxX = 0;
+        let minY = height;
+        let maxY = 0;
+        while (stack.length) {
+          const index = stack.pop();
+          const x = index % width;
+          const y = Math.floor(index / width);
+          area += 1;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+          const neighbours = [index - 1, index + 1, index - width, index + width];
+          for (let direction = 0; direction < neighbours.length; direction += 1) {
+            const next = neighbours[direction];
+            if (next < 0 || next >= mask.length || visited[next] || !mask[next]) continue;
+            if (direction === 0 && x === 0) continue;
+            if (direction === 1 && x === width - 1) continue;
+            visited[next] = 1;
+            stack.push(next);
+          }
+        }
+        components.push({ x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1, area });
+      }
+      return components;
+    }
+
+    function findLikelyResultBand() {
+      const sourceWidth = tgSourceCanvas.width;
+      const sourceHeight = tgSourceCanvas.height;
+      const scale = Math.min(1, 700 / Math.max(sourceWidth, sourceHeight));
+      const analysis = document.createElement("canvas");
+      analysis.width = Math.max(1, Math.round(sourceWidth * scale));
+      analysis.height = Math.max(1, Math.round(sourceHeight * scale));
+      const context = analysis.getContext("2d", { willReadFrequently: true });
+      context.drawImage(tgSourceCanvas, 0, 0, analysis.width, analysis.height);
+      const pixels = context.getImageData(0, 0, analysis.width, analysis.height).data;
+      const mask = new Uint8Array(analysis.width * analysis.height);
+      for (let index = 0; index < mask.length; index += 1) {
+        const offset = index * 4;
+        const red = pixels[offset];
+        const green = pixels[offset + 1];
+        const blue = pixels[offset + 2];
+        mask[index] = red > 155 && red > green * 1.55 && red > blue * 1.25 && green < 145 ? 1 : 0;
+      }
+      const candidates = connectedComponents(mask, analysis.width, analysis.height)
+        .filter(component => {
+          const aspect = component.width / component.height;
+          const fill = component.area / (component.width * component.height);
+          return component.area >= 24 && component.width >= 7 && component.height >= 5
+            && aspect >= 0.75 && aspect <= 4.2 && fill >= 0.16;
+        })
+        .sort((a, b) => b.area * (b.area / (b.width * b.height)) - a.area * (a.area / (a.width * a.height)));
+      if (!candidates.length) return null;
+      const button = candidates[0];
+      const xScale = sourceWidth / analysis.width;
+      const yScale = sourceHeight / analysis.height;
+      const x = button.x * xScale;
+      const y = button.y * yScale;
+      const width = button.width * xScale;
+      const height = button.height * yScale;
+      const left = clamp(x - width * 3.15, 0, sourceWidth);
+      const top = clamp(y - height * 1.25, 0, sourceHeight);
+      const right = clamp(x + width * 4.15, 0, sourceWidth);
+      const bottom = clamp(y + height * 2.25, 0, sourceHeight);
+      return { x: left, y: top, width: right - left, height: bottom - top };
+    }
+
+    function detectCardBoxes(selection) {
+      const region = normalizeRect(selection);
+      const targetWidth = Math.min(700, Math.max(280, Math.round(region.width)));
+      const scale = targetWidth / region.width;
+      const analysis = document.createElement("canvas");
+      analysis.width = targetWidth;
+      analysis.height = Math.max(1, Math.round(region.height * scale));
+      const context = analysis.getContext("2d", { willReadFrequently: true });
+      context.drawImage(tgSourceCanvas, region.x, region.y, region.width, region.height, 0, 0, analysis.width, analysis.height);
+      const pixels = context.getImageData(0, 0, analysis.width, analysis.height).data;
+      const mask = new Uint8Array(analysis.width * analysis.height);
+      for (let index = 0; index < mask.length; index += 1) {
+        const offset = index * 4;
+        const red = pixels[offset];
+        const green = pixels[offset + 1];
+        const blue = pixels[offset + 2];
+        const high = Math.max(red, green, blue);
+        const low = Math.min(red, green, blue);
+        mask[index] = low > 158 && high - low < 82 ? 1 : 0;
+      }
+      let boxes = connectedComponents(mask, analysis.width, analysis.height)
+        .filter(component => {
+          const aspect = component.width / component.height;
+          const fill = component.area / (component.width * component.height);
+          return component.height >= analysis.height * 0.22
+            && component.height <= analysis.height * 0.92
+            && component.width >= analysis.height * 0.10
+            && aspect >= 0.34 && aspect <= 1.55 && fill >= 0.32;
+        })
+        .map(component => ({
+          x: region.x + component.x / scale,
+          y: region.y + component.y / scale,
+          width: component.width / scale,
+          height: component.height / scale,
+          area: component.area / (scale * scale)
+        }));
+
+      boxes = boxes.filter((box, index) => !boxes.some((other, otherIndex) =>
+        otherIndex !== index
+        && other.area > box.area
+        && Math.abs((other.x + other.width / 2) - (box.x + box.width / 2)) < Math.max(other.width, box.width) * 0.35
+        && Math.abs((other.y + other.height / 2) - (box.y + box.height / 2)) < Math.max(other.height, box.height) * 0.35
+      ));
+      const middle = region.x + region.width / 2;
+      const player = boxes.filter(box => box.x + box.width / 2 < middle - region.width * 0.05)
+        .sort((a, b) => a.x - b.x);
+      const banker = boxes.filter(box => box.x + box.width / 2 > middle + region.width * 0.05)
+        .sort((a, b) => a.x - b.x);
+      return {
+        player: player.length > 3 ? player.slice(player.length - 3) : player,
+        banker: banker.length > 3 ? banker.slice(0, 3) : banker
+      };
+    }
+
+    function fallbackCardBoxes(selection) {
+      const region = normalizeRect(selection);
+      const cardWidth = region.width * 0.062;
+      const cardHeight = region.height * 0.37;
+      const y = region.y + region.height * 0.54;
+      const make = fractions => fractions.map(fraction => ({
+        x: region.x + region.width * fraction - cardWidth / 2,
+        y,
+        width: cardWidth,
+        height: cardHeight,
+        area: cardWidth * cardHeight
+      }));
+      return {
+        player: make([0.17, 0.25, 0.33]),
+        banker: make([0.74, 0.82, 0.90])
+      };
+    }
+
+    function renderTgImage() {
+      if (!tgImageBitmap) return;
+      tgImageContext.clearRect(0, 0, tgImageCanvas.width, tgImageCanvas.height);
+      tgImageContext.drawImage(tgSourceCanvas, 0, 0);
+      if (tgSelection) {
+        const region = normalizeRect(tgSelection);
+        tgImageContext.save();
+        tgImageContext.fillStyle = "rgba(15, 23, 42, 0.38)";
+        tgImageContext.fillRect(0, 0, tgImageCanvas.width, region.y);
+        tgImageContext.fillRect(0, region.y, region.x, region.height);
+        tgImageContext.fillRect(region.x + region.width, region.y, tgImageCanvas.width - region.x - region.width, region.height);
+        tgImageContext.fillRect(0, region.y + region.height, tgImageCanvas.width, tgImageCanvas.height - region.y - region.height);
+        tgImageContext.strokeStyle = "#22d3ee";
+        tgImageContext.lineWidth = Math.max(2, tgImageCanvas.width / 500);
+        tgImageContext.strokeRect(region.x, region.y, region.width, region.height);
+        tgImageContext.restore();
+      }
+      for (const side of ["player", "banker"]) {
+        tgImageContext.save();
+        tgImageContext.strokeStyle = side === "player" ? "#60a5fa" : "#f87171";
+        tgImageContext.lineWidth = Math.max(2, tgImageCanvas.width / 600);
+        for (const box of tgDetectedBoxes[side]) tgImageContext.strokeRect(box.x, box.y, box.width, box.height);
+        tgImageContext.restore();
+      }
+    }
+
+    function canvasPoint(event) {
+      const bounds = tgImageCanvas.getBoundingClientRect();
+      return {
+        x: clamp((event.clientX - bounds.left) * tgImageCanvas.width / bounds.width, 0, tgImageCanvas.width),
+        y: clamp((event.clientY - bounds.top) * tgImageCanvas.height / bounds.height, 0, tgImageCanvas.height)
+      };
+    }
+
+    async function loadTgImage(file) {
+      if (!file || !file.type.startsWith("image/")) {
+        setImageReaderStatus("请选择PNG、JPG或WebP截图。", "格式错误");
+        return;
+      }
+      try {
+        setImageReaderStatus("正在读取截图…");
+        if (tgImageBitmap?.close) tgImageBitmap.close();
+        tgImageBitmap = await createImageBitmap(file);
+        const scale = Math.min(1, 1400 / Math.max(tgImageBitmap.width, tgImageBitmap.height));
+        tgSourceCanvas.width = Math.max(1, Math.round(tgImageBitmap.width * scale));
+        tgSourceCanvas.height = Math.max(1, Math.round(tgImageBitmap.height * scale));
+        tgImageCanvas.width = tgSourceCanvas.width;
+        tgImageCanvas.height = tgSourceCanvas.height;
+        tgSourceContext.drawImage(tgImageBitmap, 0, 0, tgSourceCanvas.width, tgSourceCanvas.height);
+        tgSelection = findLikelyResultBand() || { x: 0, y: 0, width: tgSourceCanvas.width, height: tgSourceCanvas.height };
+        tgDetectedBoxes = detectCardBoxes(tgSelection);
+        recognizedCommitted = false;
+        document.getElementById("tgImageStage").classList.add("active");
+        document.getElementById("recognizedPanel").classList.add("active");
+        document.getElementById("recognizeTgImage").disabled = false;
+        document.getElementById("clearTgImage").disabled = false;
+        renderTgImage();
+        setImageReaderStatus("已定位本局结果，正在识别牌面…", "识别中");
+        await recognizeTgImage();
+      } catch (error) {
+        setImageReaderStatus(`截图读取失败：${error.message}`, "读取失败");
+      }
+    }
+
+    function makeRankCanvas(box, rotation) {
+      const card = document.createElement("canvas");
+      const portraitWidth = Math.max(80, Math.round(rotation % 180 === 0 ? box.width : box.height));
+      const portraitHeight = Math.max(110, Math.round(rotation % 180 === 0 ? box.height : box.width));
+      const full = document.createElement("canvas");
+      full.width = Math.max(1, Math.round(box.width));
+      full.height = Math.max(1, Math.round(box.height));
+      full.getContext("2d").drawImage(tgSourceCanvas, box.x, box.y, box.width, box.height, 0, 0, full.width, full.height);
+      card.width = portraitWidth;
+      card.height = portraitHeight;
+      const cardContext = card.getContext("2d");
+      cardContext.fillStyle = "white";
+      cardContext.fillRect(0, 0, card.width, card.height);
+      cardContext.translate(card.width / 2, card.height / 2);
+      cardContext.rotate(rotation * Math.PI / 180);
+      const drawWidth = rotation % 180 === 0 ? card.width : card.height;
+      const drawHeight = rotation % 180 === 0 ? card.height : card.width;
+      cardContext.drawImage(full, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+
+      const rank = document.createElement("canvas");
+      rank.width = 260;
+      rank.height = 170;
+      const rankContext = rank.getContext("2d", { willReadFrequently: true });
+      rankContext.fillStyle = "white";
+      rankContext.fillRect(0, 0, rank.width, rank.height);
+      rankContext.drawImage(card, 0, 0, card.width * 0.78, card.height * 0.44, 8, 8, rank.width - 16, rank.height - 16);
+      const image = rankContext.getImageData(0, 0, rank.width, rank.height);
+      for (let index = 0; index < image.data.length; index += 4) {
+        const red = image.data[index];
+        const green = image.data[index + 1];
+        const blue = image.data[index + 2];
+        const luminance = red * 0.299 + green * 0.587 + blue * 0.114;
+        const ink = luminance < 185 || (red > 120 && red > green * 1.35 && red > blue * 1.2);
+        const value = ink ? 0 : 255;
+        image.data[index] = value;
+        image.data[index + 1] = value;
+        image.data[index + 2] = value;
+        image.data[index + 3] = 255;
+      }
+      rankContext.putImageData(image, 0, 0);
+      return rank;
+    }
+
+    function normalizeOcrRank(text) {
+      const clean = String(text || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (clean.includes("10") || clean.includes("1O")) return "T";
+      for (const key of ["A", "K", "Q", "J", "9", "8", "7", "6", "5", "4", "3", "2"])
+        if (clean.includes(key)) return key;
+      return "";
+    }
+
+    async function getTgOcrWorker() {
+      if (tgOcrWorker) return tgOcrWorker;
+      if (!window.Tesseract) throw new Error("识别引擎加载失败，请检查网络后重试。 ");
+      tgOcrWorker = await Tesseract.createWorker("eng", 1, {
+        logger: message => {
+          if (message.status === "recognizing text")
+            setImageReaderStatus(`正在识别牌面 ${Math.round((message.progress || 0) * 100)}%…`, "识别中");
+        }
+      });
+      await tgOcrWorker.setParameters({
+        tessedit_char_whitelist: "A2345678910JQK",
+        tessedit_pageseg_mode: Tesseract.PSM?.SINGLE_LINE || "7"
+      });
+      return tgOcrWorker;
+    }
+
+    async function recognizeCardBox(worker, box) {
+      const horizontal = box.width > box.height * 1.05;
+      const rotations = horizontal ? [90, -90] : [0, 180];
+      let best = { key: "", confidence: 0, text: "" };
+      for (const rotation of rotations) {
+        const result = await worker.recognize(makeRankCanvas(box, rotation));
+        const key = normalizeOcrRank(result.data.text);
+        const confidence = Number(result.data.confidence || 0);
+        if (key && confidence >= best.confidence) best = { key, confidence, text: result.data.text };
+        if (best.confidence >= 82) break;
+      }
+      return best;
+    }
+
+    async function recognizeTgImage() {
+      if (!tgImageBitmap || !tgSelection) return;
+      const recognizeButton = document.getElementById("recognizeTgImage");
+      recognizeButton.disabled = true;
+      recognizedCommitted = false;
+      try {
+        let boxes = detectCardBoxes(tgSelection);
+        const uncertainPosition = boxes.player.length < 2 || boxes.banker.length < 2;
+        if (uncertainPosition) boxes = fallbackCardBoxes(tgSelection);
+        tgDetectedBoxes = boxes;
+        renderTgImage();
+        clearRecognizedHand(false);
+        const worker = await getTgOcrWorker();
+        let recognizedCount = 0;
+        for (const side of ["Player", "Banker"]) {
+          const sideKey = side.toLowerCase();
+          for (let index = 0; index < Math.min(3, boxes[sideKey].length); index += 1) {
+            setImageReaderStatus(`正在识别${side === "Player" ? "闲" : "庄"}家第${index + 1}张牌…`, "识别中");
+            const result = await recognizeCardBox(worker, boxes[sideKey][index]);
+            const select = document.getElementById(`recognized${side}${index + 1}`);
+            select.value = result.key;
+            select.dataset.confidence = result.key ? String(result.confidence) : "";
+            if (result.key) recognizedCount += 1;
+          }
+        }
+        updateRecognizedSummary();
+        const positioningNote = uncertainPosition ? "，牌位定位不确定" : "";
+        setImageReaderStatus(`识别到${recognizedCount}张牌${positioningNote}，请核对后写入。`, recognizedCount >= 4 ? "待确认" : "需修正");
+      } catch (error) {
+        updateRecognizedSummary();
+        setImageReaderStatus(`自动识别失败：${error.message} 请直接选择牌面。`, "需手动修正");
+      } finally {
+        recognizeButton.disabled = false;
+      }
+    }
+
+    function recognizedSideCards(side) {
+      return [1, 2, 3]
+        .map(index => document.getElementById(`recognized${side}${index}`).value)
+        .filter(Boolean);
+    }
+
+    function updateRecognizedSummary() {
+      const player = recognizedSideCards("Player");
+      const banker = recognizedSideCards("Banker");
+      const playerTotal = player.reduce((sum, key) => sum + rankValue(key), 0) % 10;
+      const bankerTotal = banker.reduce((sum, key) => sum + rankValue(key), 0) % 10;
+      document.getElementById("recognizedPlayerTotal").textContent = player.length >= 2 ? `${playerTotal}点` : "未完整";
+      document.getElementById("recognizedBankerTotal").textContent = banker.length >= 2 ? `${bankerTotal}点` : "未完整";
+      const complete = player.length >= 2 && banker.length >= 2;
+      let result = "请核对牌面";
+      if (complete) result = playerTotal === bankerTotal ? `和局 ${playerTotal}:${bankerTotal}`
+        : playerTotal > bankerTotal ? `闲胜 ${playerTotal}:${bankerTotal}`
+        : `庄胜 ${bankerTotal}:${playerTotal}`;
+      const confidenceValues = Array.from(document.querySelectorAll("#recognizedPanel select"))
+        .map(select => Number(select.dataset.confidence))
+        .filter(value => Number.isFinite(value) && value > 0);
+      if (confidenceValues.length) {
+        const average = confidenceValues.reduce((sum, value) => sum + value, 0) / confidenceValues.length;
+        result += ` · 识别可信度${average.toFixed(0)}%`;
+      }
+      document.getElementById("recognizedSummary").textContent = result;
+      document.getElementById("commitRecognizedHand").disabled = !complete || recognizedCommitted;
+    }
+
+    function clearRecognizedHand(update = true) {
+      document.querySelectorAll("#recognizedPanel select").forEach(select => {
+        select.value = "";
+        select.dataset.confidence = "";
+      });
+      recognizedCommitted = false;
+      if (update) updateRecognizedSummary();
+    }
+
+    function commitRecognizedHand() {
+      const player = recognizedSideCards("Player");
+      const banker = recognizedSideCards("Banker");
+      if (player.length < 2 || banker.length < 2) return;
+      const cards = [];
+      for (let index = 0; index < 3; index += 1) {
+        if (player[index]) cards.push({ key: player[index], amount: 1, side: "player" });
+        if (banker[index]) cards.push({ key: banker[index], amount: 1, side: "banker" });
+      }
+      try {
+        validateAddition(cards);
+      } catch (error) {
+        setImageReaderStatus(error.message, "无法写入");
+        return;
+      }
+      for (const card of cards) applyCardDelta(card.key, 1);
+      const playerTotal = player.reduce((sum, key) => sum + rankValue(key), 0) % 10;
+      const bankerTotal = banker.reduce((sum, key) => sum + rankValue(key), 0) % 10;
+      const winner = playerTotal === bankerTotal ? "和" : playerTotal > bankerTotal ? "闲" : "庄";
+      const handNumber = history.filter(entry => entry.kind === "recognized-hand").length + 1;
+      history.push({
+        type: "cards",
+        kind: "recognized-hand",
+        label: `第${handNumber}局 ${winner}胜`,
+        cards
+      });
+      recognizedCommitted = true;
+      calculate();
+      updateRecognizedSummary();
+      setImageReaderStatus(`第${handNumber}局已写入：闲${playerTotal}点，庄${bankerTotal}点，${winner}胜。`, "已写入");
+    }
+
+    function clearTgImage() {
+      if (tgImageBitmap?.close) tgImageBitmap.close();
+      tgImageBitmap = null;
+      tgSelection = null;
+      tgDetectedBoxes = { player: [], banker: [] };
+      tgImageCanvas.width = 1;
+      tgImageCanvas.height = 1;
+      document.getElementById("tgImageInput").value = "";
+      document.getElementById("tgImageStage").classList.remove("active");
+      document.getElementById("recognizedPanel").classList.remove("active");
+      document.getElementById("recognizeTgImage").disabled = true;
+      document.getElementById("clearTgImage").disabled = true;
+      clearRecognizedHand();
+      setImageReaderStatus("截图只在当前设备处理。", "等待截图");
+    }
+
+    async function readClipboardImage() {
+      try {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          const type = item.types.find(value => value.startsWith("image/"));
+          if (type) {
+            await loadTgImage(await item.getType(type));
+            return;
+          }
+        }
+        setImageReaderStatus("剪贴板里没有图片。", "未找到图片");
+      } catch (error) {
+        setImageReaderStatus("当前浏览器不能直接读取图片，请使用“选择截图”。", "读取受限");
+      }
+    }
 
     function syncTelegramSafeArea(telegram) {
       const inset = telegram.contentSafeAreaInset || telegram.safeAreaInset;
@@ -1600,8 +2255,53 @@
       calculate();
     }
 
+    tgImageCanvas.addEventListener("pointerdown", event => {
+      if (!tgImageBitmap) return;
+      tgDragStart = canvasPoint(event);
+      tgImageCanvas.setPointerCapture?.(event.pointerId);
+    });
+    tgImageCanvas.addEventListener("pointermove", event => {
+      if (!tgDragStart) return;
+      const point = canvasPoint(event);
+      tgSelection = { x: tgDragStart.x, y: tgDragStart.y, width: point.x - tgDragStart.x, height: point.y - tgDragStart.y };
+      tgDetectedBoxes = { player: [], banker: [] };
+      renderTgImage();
+    });
+    tgImageCanvas.addEventListener("pointerup", event => {
+      if (!tgDragStart) return;
+      const point = canvasPoint(event);
+      const selection = normalizeRect({ x: tgDragStart.x, y: tgDragStart.y, width: point.x - tgDragStart.x, height: point.y - tgDragStart.y });
+      tgDragStart = null;
+      if (selection.width >= 30 && selection.height >= 20) {
+        tgSelection = selection;
+        tgDetectedBoxes = detectCardBoxes(tgSelection);
+        recognizedCommitted = false;
+        renderTgImage();
+        setImageReaderStatus("已更新识别区域，点击“识别牌面”重试。", "区域已调整");
+      }
+    });
+
+    document.getElementById("tgImageInput").addEventListener("change", event => loadTgImage(event.target.files?.[0]));
+    document.getElementById("pasteTgImage").addEventListener("click", readClipboardImage);
+    document.getElementById("recognizeTgImage").addEventListener("click", recognizeTgImage);
+    document.getElementById("clearTgImage").addEventListener("click", clearTgImage);
+    document.getElementById("commitRecognizedHand").addEventListener("click", commitRecognizedHand);
+    document.getElementById("resetRecognizedHand").addEventListener("click", () => clearRecognizedHand());
+    document.addEventListener("paste", event => {
+      const file = Array.from(event.clipboardData?.files || []).find(item => item.type.startsWith("image/"));
+      if (file) loadTgImage(file);
+    });
+    const imageReader = document.getElementById("imageReader");
+    imageReader.addEventListener("dragover", event => event.preventDefault());
+    imageReader.addEventListener("drop", event => {
+      event.preventDefault();
+      const file = Array.from(event.dataTransfer?.files || []).find(item => item.type.startsWith("image/"));
+      if (file) loadTgImage(file);
+    });
+
     initTelegramWebApp();
     buildRankControls();
+    buildRecognizedCardControls();
     const calculationControlIds = [
       "decks", "unitBet", "edgeBuffer", "bankerRule", "payPair",
       "payDragon", "payPanda", "payTie", "paySmallLucky6", "payBigLucky6",
