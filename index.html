@@ -1411,7 +1411,17 @@
       const rankContext = rank.getContext("2d", { willReadFrequently: true });
       rankContext.fillStyle = "white";
       rankContext.fillRect(0, 0, rank.width, rank.height);
-      rankContext.drawImage(card, 0, 0, card.width * 0.78, card.height * 0.44, 8, 8, rank.width - 16, rank.height - 16);
+      rankContext.drawImage(
+        card,
+        card.width * 0.06,
+        card.height * 0.03,
+        card.width * 0.86,
+        card.height * 0.33,
+        8,
+        8,
+        rank.width - 16,
+        rank.height - 16
+      );
       const image = rankContext.getImageData(0, 0, rank.width, rank.height);
       for (let index = 0; index < image.data.length; index += 4) {
         const red = image.data[index];
@@ -1483,12 +1493,19 @@
     }
 
     async function recognizeCardOnce(worker, job) {
-      const canvas = makeRankCanvas(job.box, preferredCardRotation(job.side, job.box));
-      const result = await worker.recognize(canvas);
-      return {
-        key: normalizeOcrRank(result.data.text),
-        confidence: Number(result.data.confidence || 0)
-      };
+      const preferred = preferredCardRotation(job.side, job.box);
+      const rotations = job.box.width > job.box.height * 1.05 ? [preferred, -preferred] : [preferred];
+      let best = { key: "", confidence: 0 };
+      for (const rotation of rotations) {
+        const result = await worker.recognize(makeRankCanvas(job.box, rotation));
+        const candidate = {
+          key: normalizeOcrRank(result.data.text),
+          confidence: Number(result.data.confidence || 0)
+        };
+        if (candidate.key && candidate.confidence >= best.confidence) best = candidate;
+        if (best.confidence >= 55) break;
+      }
+      return best;
     }
 
     async function recognizeTgImage() {
