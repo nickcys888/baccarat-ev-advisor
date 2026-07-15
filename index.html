@@ -276,6 +276,44 @@
       justify-content: flex-start;
     }
 
+    .paste-target {
+      display: grid;
+      place-items: center;
+      gap: 7px;
+      width: 100%;
+      min-height: 92px;
+      margin-top: 10px;
+      padding: 14px;
+      border: 2px dashed #7aa7a2;
+      border-radius: 7px;
+      background: var(--panel);
+      color: var(--ink);
+      text-align: center;
+      cursor: text;
+      outline: none;
+    }
+
+    .paste-target:focus {
+      border-style: solid;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
+    }
+
+    .paste-target strong { font-size: 15px; }
+
+    .paste-target kbd {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      background: var(--soft);
+      padding: 3px 7px;
+      color: var(--ink);
+      font: 750 13px/1.2 "Segoe UI", Arial, sans-serif;
+    }
+
+    .paste-target .fine { pointer-events: none; }
+
     .file-button {
       display: inline-flex;
       align-items: center;
@@ -861,22 +899,24 @@
 
         <div id="imageReader" class="image-reader">
           <div class="image-reader-head">
-            <h2>TG截图识牌</h2>
-            <span id="imageReaderBadge" class="fine">等待截图</span>
+            <h2>TG直接粘贴识牌</h2>
+            <span id="imageReaderBadge" class="fine">等待粘贴</span>
+          </div>
+          <input id="tgImageInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+          <div id="tgPasteTarget" class="paste-target" contenteditable="true" role="textbox" aria-label="在此粘贴TG图片" spellcheck="false">
+            <strong>从TG复制图片后粘贴到这里</strong>
+            <span><kbd>Ctrl</kbd> + <kbd>V</kbd></span>
+            <span class="fine">手机可长按此处选择“粘贴”</span>
           </div>
           <div class="image-reader-actions">
-            <label class="file-button" title="选择TG中的本局结果截图">
-              选择截图
-              <input id="tgImageInput" type="file" accept="image/png,image/jpeg,image/webp" capture="environment">
-            </label>
-            <button id="pasteTgImage" type="button" class="secondary" title="读取剪贴板中的截图">粘贴截图</button>
+            <button id="pasteTgImage" type="button" title="直接读取剪贴板中的图片">读取剪贴板</button>
             <button id="recognizeTgImage" type="button" disabled>识别牌面</button>
             <button id="clearTgImage" type="button" class="secondary" disabled>清除</button>
           </div>
           <div id="tgImageStage" class="image-stage">
             <canvas id="tgImageCanvas" aria-label="TG截图识别区域"></canvas>
           </div>
-          <div id="imageReaderStatus" class="image-reader-status">截图只在当前设备处理。</div>
+          <div id="imageReaderStatus" class="image-reader-status">直接粘贴即可；图片只在当前设备处理。</div>
 
           <div id="recognizedPanel" class="recognized-panel">
             <div class="recognized-sides">
@@ -1542,7 +1582,23 @@
       document.getElementById("recognizeTgImage").disabled = true;
       document.getElementById("clearTgImage").disabled = true;
       clearRecognizedHand();
-      setImageReaderStatus("截图只在当前设备处理。", "等待截图");
+      resetPasteTarget();
+      setImageReaderStatus("直接粘贴即可；图片只在当前设备处理。", "等待粘贴");
+    }
+
+    function resetPasteTarget() {
+      document.getElementById("tgPasteTarget").innerHTML = `
+        <strong>从TG复制图片后粘贴到这里</strong>
+        <span><kbd>Ctrl</kbd> + <kbd>V</kbd></span>
+        <span class="fine">手机可长按此处选择“粘贴”</span>
+      `;
+    }
+
+    function imageFromPasteEvent(event) {
+      const item = Array.from(event.clipboardData?.items || [])
+        .find(candidate => candidate.kind === "file" && candidate.type.startsWith("image/"));
+      return item?.getAsFile() || Array.from(event.clipboardData?.files || [])
+        .find(file => file.type.startsWith("image/")) || null;
     }
 
     async function readClipboardImage() {
@@ -1557,7 +1613,8 @@
         }
         setImageReaderStatus("剪贴板里没有图片。", "未找到图片");
       } catch (error) {
-        setImageReaderStatus("当前浏览器不能直接读取图片，请使用“选择截图”。", "读取受限");
+        document.getElementById("tgPasteTarget").focus();
+        setImageReaderStatus("浏览器不允许按钮读取剪贴板，请在虚线框内长按粘贴，电脑直接按 Ctrl+V。", "等待粘贴");
       }
     }
 
@@ -2291,8 +2348,22 @@
     document.getElementById("commitRecognizedHand").addEventListener("click", commitRecognizedHand);
     document.getElementById("resetRecognizedHand").addEventListener("click", () => clearRecognizedHand());
     document.addEventListener("paste", event => {
-      const file = Array.from(event.clipboardData?.files || []).find(item => item.type.startsWith("image/"));
-      if (file) loadTgImage(file);
+      const file = imageFromPasteEvent(event);
+      if (file) {
+        event.preventDefault();
+        resetPasteTarget();
+        loadTgImage(file);
+        return;
+      }
+      if (event.target === document.getElementById("tgPasteTarget")) {
+        event.preventDefault();
+        resetPasteTarget();
+        setImageReaderStatus("剪贴板里没有图片，请先在TG里复制图片。", "没有图片");
+      }
+    });
+    document.getElementById("tgPasteTarget").addEventListener("click", event => event.currentTarget.focus());
+    document.getElementById("tgPasteTarget").addEventListener("keydown", event => {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "v") event.preventDefault();
     });
     const imageReader = document.getElementById("imageReader");
     imageReader.addEventListener("dragover", event => event.preventDefault());
