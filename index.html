@@ -1298,10 +1298,7 @@
         .sort((a, b) => a.x - b.x);
       const banker = boxes.filter(box => box.x + box.width / 2 > middle + region.width * 0.05)
         .sort((a, b) => a.x - b.x);
-      return {
-        player: player.length > 3 ? player.slice(player.length - 3) : player,
-        banker: banker.length > 3 ? banker.slice(0, 3) : banker
-      };
+      return { player, banker };
     }
 
     function fallbackCardBoxes(selection) {
@@ -1320,6 +1317,39 @@
         player: make([0.17, 0.25, 0.33]),
         banker: make([0.74, 0.82, 0.90])
       };
+    }
+
+    function mapCardBoxesToSlots(boxes, selection) {
+      const region = normalizeRect(selection);
+      const slotCenters = {
+        Player: [0.17, 0.25, 0.33],
+        Banker: [0.74, 0.82, 0.90]
+      };
+      const jobs = [];
+      for (const side of ["Player", "Banker"]) {
+        const chosen = new Map();
+        for (const box of boxes[side.toLowerCase()]) {
+          const center = (box.x + box.width / 2 - region.x) / region.width;
+          let nearestIndex = -1;
+          let nearestDistance = Infinity;
+          slotCenters[side].forEach((target, index) => {
+            const distance = Math.abs(center - target);
+            if (distance < nearestDistance) {
+              nearestIndex = index;
+              nearestDistance = distance;
+            }
+          });
+          if (nearestDistance > 0.065) continue;
+          const existing = chosen.get(nearestIndex);
+          if (!existing || nearestDistance < existing.distance) {
+            chosen.set(nearestIndex, { side, index: nearestIndex, box, distance: nearestDistance });
+          }
+        }
+        for (let index = 0; index < 3; index += 1) {
+          if (chosen.has(index)) jobs.push(chosen.get(index));
+        }
+      }
+      return jobs;
     }
 
     function renderTgImage() {
@@ -1464,7 +1494,7 @@
         });
         await worker.setParameters({
           tessedit_char_whitelist: "A2345678910JQK",
-          tessedit_pageseg_mode: Tesseract.PSM?.SINGLE_WORD || "8"
+          tessedit_pageseg_mode: Tesseract.PSM?.SINGLE_LINE || "7"
         });
         tgOcrWorker = worker;
         return worker;
@@ -1517,15 +1547,21 @@
       tgOcrBusy = true;
       try {
         let boxes = detectCardBoxes(tgSelection);
-        const uncertainPosition = boxes.player.length < 2 || boxes.banker.length < 2;
-        if (uncertainPosition) boxes = fallbackCardBoxes(tgSelection);
-        tgDetectedBoxes = boxes;
+        let jobs = mapCardBoxesToSlots(boxes, tgSelection);
+        let uncertainPosition = ["Player", "Banker"].some(side =>
+          jobs.filter(job => job.side === side).length < 2
+        );
+        if (uncertainPosition) {
+          boxes = fallbackCardBoxes(tgSelection);
+          jobs = mapCardBoxesToSlots(boxes, tgSelection);
+        }
+        tgDetectedBoxes = {
+          player: jobs.filter(job => job.side === "Player").map(job => job.box),
+          banker: jobs.filter(job => job.side === "Banker").map(job => job.box)
+        };
         renderTgImage();
         clearRecognizedHand(false);
         const worker = await getTgOcrWorker();
-        const jobs = [];
-        for (const side of ["Player", "Banker"])
-          boxes[side.toLowerCase()].slice(0, 3).forEach((box, index) => jobs.push({ side, index, box }));
         const recognized = [];
         for (let index = 0; index < jobs.length; index += 1) {
           setImageReaderStatus(`正在识别第${index + 1}/${jobs.length}张牌…`, "识别中");
