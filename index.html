@@ -1124,6 +1124,8 @@
     let tgDragStart = null;
     let tgDetectedBoxes = { player: [], banker: [] };
     let tgOcrWorker = null;
+    let tgOcrWorkerPromise = null;
+    let tgOcrBusy = false;
     let recognizedCommitted = false;
 
     function buildRecognizedCardControls() {
@@ -1432,35 +1434,83 @@
 
     async function getTgOcrWorker() {
       if (tgOcrWorker) return tgOcrWorker;
+      if (tgOcrWorkerPromise) return tgOcrWorkerPromise;
       if (!window.Tesseract) throw new Error("识别引擎加载失败，请检查网络后重试。 ");
-      tgOcrWorker = await Tesseract.createWorker("eng", 1, {
-        workerPath: new URL("vendor/tesseract-worker.min.js", window.location.href).href,
-        langPath: new URL("vendor/", window.location.href).href,
-        corePath: new URL("vendor/", window.location.href).href,
-        logger: message => {
-          if (message.status === "recognizing text")
-            setImageReaderStatus(`正在识别牌面 ${Math.round((message.progress || 0) * 100)}%…`, "识别中");
-        }
-      });
-      await tgOcrWorker.setParameters({
-        tessedit_char_whitelist: "A2345678910JQK",
-        tessedit_pageseg_mode: Tesseract.PSM?.SINGLE_LINE || "7"
-      });
-      return tgOcrWorker;
+      tgOcrWorkerPromise = (async () => {
+        const worker = await Tesseract.createWorker("eng", 1, {
+          workerPath: new URL("vendor/tesseract-worker.min.js", window.location.href).href,
+          langPath: new URL("vendor/", window.location.href).href,
+          corePath: new URL("vendor/", window.location.href).href,
+          logger: message => {
+            if (tgOcrBusy && message.status === "recognizing text")
+              setImageReaderStatus(`正在识别牌面 ${Math.round((message.progress || 0) * 100)}%…`, "识别中");
+          }
+        });
+        await worker.setParameters({
+          tessedit_char_whitelist: "A2345678910JQK",
+          tessedit_pageseg_mode: Tesseract.PSM?.SINGLE_LINE || "7"
+        });
+        tgOcrWorker = worker;
+        return worker;
+      })();
+      try {
+        return await tgOcrWorkerPromise;
+      } finally {
+        if (!tgOcrWorker) tgOcrWorkerPromise = null;
+      }
     }
 
-    async function recognizeCardBox(worker, box) {
-      const horizontal = box.width > box.height * 1.05;
-      const rotations = horizontal ? [90, -90] : [0, 180];
-      let best = { key: "", confidence: 0, text: "" };
-      for (const rotation of rotations) {
-        const result = await worker.recognize(makeRankCanvas(box, rotation));
-        const key = normalizeOcrRank(result.data.text);
-        const confidence = Number(result.data.confidence || 0);
-        if (key && confidence >= best.confidence) best = { key, confidence, text: result.data.text };
-        if (best.confidence >= 82) break;
+    function warmTgOcrWorker() {
+      if (tgOcrWorker || tgOcrWorkerPromise) return;
+      setImageReaderStatus("正在后台准备快速识别引擎…", "准备中");
+      getTgOcrWorker()
+        .then(() => {
+          if (!tgImageBitmap) setImageReaderStatus("识别引擎已就绪，直接粘贴图片。", "可粘贴");
+        })
+        .catch(() => {
+          if (!tgImageBitmap) setImageReaderStatus("识别引擎准备失败，刷新页面后重试。", "准备失败");
+        });
+    }
+
+    function preferredCardRotation(side, box) {
+      if (box.width <= box.height * 1.05) return 0;
+      return side === "Player" ? 90 : -90;
+    }
+
+    function ranksFromOcrText(text) {
+      return String(text || "").toUpperCase().match(/10|[AKQJ2-9]/g) || [];
+    }
+
+    async function recognizeCardStrip(worker, jobs) {
+      const slotWidth = 280;
+      const slotHeight = 180;
+      const strip = document.createElement("canvas");
+      strip.width = Math.max(slotWidth, jobs.length * slotWidth);
+      strip.height = slotHeight;
+      const context = strip.getContext("2d");
+      context.fillStyle = "white";
+      context.fillRect(0, 0, strip.width, strip.height);
+      jobs.forEach((job, index) => {
+        const rankCanvas = makeRankCanvas(job.box, preferredCardRotation(job.side, job.box));
+        context.drawImage(rankCanvas, index * slotWidth + 10, 5, slotWidth - 20, slotHeight - 10);
+      });
+
+      const result = await worker.recognize(strip);
+      const recognized = jobs.map(() => ({ key: "", confidence: 0 }));
+      const words = Array.isArray(result.data.words) ? result.data.words : [];
+      for (const word of words) {
+        const key = normalizeOcrRank(word.text);
+        if (!key || !word.bbox) continue;
+        const center = (word.bbox.x0 + word.bbox.x1) / 2;
+        const slot = clamp(Math.floor(center / slotWidth), 0, jobs.length - 1);
+        const confidence = Number(word.confidence || 0);
+        if (confidence >= recognized[slot].confidence) recognized[slot] = { key, confidence };
       }
-      return best;
+
+      const fallback = ranksFromOcrText(result.data.text).map(normalizeRank).filter(Boolean);
+      if (!recognized.some(item => item.key) && fallback.length === jobs.length)
+        fallback.forEach((key, index) => { recognized[index] = { key, confidence: Number(result.data.confidence || 0) }; });
+      return recognized;
     }
 
     async function recognizeTgImage() {
@@ -1468,6 +1518,7 @@
       const recognizeButton = document.getElementById("recognizeTgImage");
       recognizeButton.disabled = true;
       recognizedCommitted = false;
+      tgOcrBusy = true;
       try {
         let boxes = detectCardBoxes(tgSelection);
         const uncertainPosition = boxes.player.length < 2 || boxes.banker.length < 2;
@@ -1476,18 +1527,19 @@
         renderTgImage();
         clearRecognizedHand(false);
         const worker = await getTgOcrWorker();
+        const jobs = [];
+        for (const side of ["Player", "Banker"])
+          boxes[side.toLowerCase()].slice(0, 3).forEach((box, index) => jobs.push({ side, index, box }));
+        setImageReaderStatus("正在一次识别整局牌面…", "识别中");
+        const recognized = await recognizeCardStrip(worker, jobs);
         let recognizedCount = 0;
-        for (const side of ["Player", "Banker"]) {
-          const sideKey = side.toLowerCase();
-          for (let index = 0; index < Math.min(3, boxes[sideKey].length); index += 1) {
-            setImageReaderStatus(`正在识别${side === "Player" ? "闲" : "庄"}家第${index + 1}张牌…`, "识别中");
-            const result = await recognizeCardBox(worker, boxes[sideKey][index]);
-            const select = document.getElementById(`recognized${side}${index + 1}`);
-            select.value = result.key;
-            select.dataset.confidence = result.key ? String(result.confidence) : "";
-            if (result.key) recognizedCount += 1;
-          }
-        }
+        recognized.forEach((result, jobIndex) => {
+          const job = jobs[jobIndex];
+          const select = document.getElementById(`recognized${job.side}${job.index + 1}`);
+          select.value = result.key;
+          select.dataset.confidence = result.key ? String(result.confidence) : "";
+          if (result.key) recognizedCount += 1;
+        });
         updateRecognizedSummary();
         const positioningNote = uncertainPosition ? "，牌位定位不确定" : "";
         setImageReaderStatus(`识别到${recognizedCount}张牌${positioningNote}，请核对后写入。`, recognizedCount >= 4 ? "待确认" : "需修正");
@@ -1495,6 +1547,7 @@
         updateRecognizedSummary();
         setImageReaderStatus(`自动识别失败：${error.message} 请直接选择牌面。`, "需手动修正");
       } finally {
+        tgOcrBusy = false;
         recognizeButton.disabled = false;
       }
     }
@@ -2412,6 +2465,7 @@
     document.getElementById("undoLastCard").addEventListener("click", undoLastCard);
     document.getElementById("resetSeen").addEventListener("click", resetShoe);
     calculate();
+    setTimeout(warmTgOcrWorker, 350);
   </script>
 </body>
 </html>
