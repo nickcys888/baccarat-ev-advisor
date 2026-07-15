@@ -1274,7 +1274,7 @@
         .filter(component => {
           const aspect = component.width / component.height;
           const fill = component.area / (component.width * component.height);
-          return component.height >= analysis.height * 0.22
+          return component.height >= analysis.height * 0.14
             && component.height <= analysis.height * 0.92
             && component.width >= analysis.height * 0.10
             && aspect >= 0.34 && aspect <= 1.55 && fill >= 0.32;
@@ -1442,6 +1442,7 @@
     function normalizeOcrRank(text) {
       const clean = String(text || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
       if (clean.includes("10") || clean.includes("1O")) return "T";
+      if (clean === "1") return "T";
       for (const key of ["A", "K", "Q", "J", "9", "8", "7", "6", "5", "4", "3", "2"])
         if (clean.includes(key)) return key;
       return "";
