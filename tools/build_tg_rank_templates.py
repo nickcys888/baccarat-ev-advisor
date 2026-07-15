@@ -8,7 +8,9 @@ from PIL import Image
 from check_tg_card_boxes import FIXTURES, ROOT, card_face_evidence, detect_cards
 
 
-OUTPUT = ROOT / "vendor" / "card-patterns-v2.js"
+HTML = ROOT / "index.html"
+SCRIPT_START = '  <script id="tg-card-patterns">\n'
+SCRIPT_END = "\n  </script>\n  <script>\n    const ranks = ["
 TARGET_WIDTH = 32
 TARGET_HEIGHT = 24
 
@@ -247,13 +249,16 @@ def main():
             key: [encode_signature(signature) for signature in signatures]
             for key, signatures in sorted(templates.items())
         }
-        OUTPUT.write_text(
-            "window.TG_PRESET_RANK_TEMPLATES = "
+        assignment = (
+            "    window.TG_PRESET_RANK_TEMPLATES = "
             + json.dumps(encoded, ensure_ascii=True, separators=(",", ":"))
-            + ";\n",
-            encoding="ascii",
+            + ";"
         )
-        print(f"wrote {OUTPUT} ({sum(map(len, encoded.values()))} templates)")
+        html = HTML.read_text(encoding="utf-8")
+        start = html.index(SCRIPT_START) + len(SCRIPT_START)
+        end = html.index(SCRIPT_END, start)
+        HTML.write_text(html[:start] + assignment + html[end:], encoding="utf-8", newline="\n")
+        print(f"updated {HTML} ({sum(map(len, encoded.values()))} templates)")
     raise SystemExit(1 if failed else 0)
 
 
