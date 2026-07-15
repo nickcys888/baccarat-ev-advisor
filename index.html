@@ -1546,15 +1546,17 @@
       recognizedCommitted = false;
       tgOcrBusy = true;
       try {
-        let boxes = detectCardBoxes(tgSelection);
-        let jobs = mapCardBoxesToSlots(boxes, tgSelection);
-        let uncertainPosition = ["Player", "Banker"].some(side =>
-          jobs.filter(job => job.side === side).length < 2
+        const boxes = detectCardBoxes(tgSelection);
+        const detectedJobs = mapCardBoxesToSlots(boxes, tgSelection);
+        const uncertainPosition = ["Player", "Banker"].some(side =>
+          detectedJobs.filter(job => job.side === side).length < 2
         );
-        if (uncertainPosition) {
-          boxes = fallbackCardBoxes(tgSelection);
-          jobs = mapCardBoxesToSlots(boxes, tgSelection);
-        }
+        const fallbackJobs = mapCardBoxesToSlots(fallbackCardBoxes(tgSelection), tgSelection);
+        const jobsBySlot = new Map(fallbackJobs.map(job => [`${job.side}-${job.index}`, job]));
+        detectedJobs.forEach(job => jobsBySlot.set(`${job.side}-${job.index}`, job));
+        const jobs = [...jobsBySlot.values()].sort((a, b) =>
+          (a.side === b.side ? 0 : a.side === "Player" ? -1 : 1) || a.index - b.index
+        );
         tgDetectedBoxes = {
           player: jobs.filter(job => job.side === "Player").map(job => job.box),
           banker: jobs.filter(job => job.side === "Banker").map(job => job.box)
